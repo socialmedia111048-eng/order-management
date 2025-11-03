@@ -1,0 +1,526 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Order & QC Manager — KJ</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @media print { .no-print { display:none !important } }
+    .thumb { width:72px; height:72px; object-fit:cover; border-radius:10px; border:1px solid #e5e7eb }
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-900">
+  <header class="no-print sticky top-0 z-10 bg-white border-b">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex items-center gap-3">
+      <div class="w-9 h-9 rounded-2xl bg-black text-white grid place-items-center text-sm font-semibold">KJ</div>
+      <div class="flex-1">
+        <h1 class="text-lg font-semibold">Order & QC Manager</h1>
+        <p class="text-xs text-gray-500">Local only • No backend • Photos saved inside your browser.</p>
+      </div>
+      <button id="btnAddBlank" class="px-3 py-2 bg-black text-white rounded-xl text-sm">Add Blank</button>
+      <button id="btnAddTemplate" class="px-3 py-2 bg-gray-900 text-white rounded-xl text-sm">Add From QC Template</button>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 py-4">
+    <section class="no-print grid gap-3 md:grid-cols-12">
+      <input id="search" class="md:col-span-4 w-full rounded-xl border px-3 py-2" placeholder="Search order, customer, SKU, specs, notes..." />
+      <select id="filterStatus" class="md:col-span-3 w-full rounded-xl border px-3 py-2"></select>
+      <select id="filterChannel" class="md:col-span-3 w-full rounded-xl border px-3 py-2"></select>
+      <div class="md:col-span-2 flex gap-2">
+        <button id="btnExportCSV" class="flex-1 rounded-xl border px-3 py-2">Export CSV</button>
+        <button id="btnExportJSON" class="flex-1 rounded-xl border px-3 py-2">Export JSON</button>
+      </div>
+      <div class="md:col-span-12 flex flex-wrap gap-2">
+        <input id="fileCSV" type="file" accept=".csv" class="hidden" />
+        <input id="fileJSON" type="file" accept=".json" class="hidden" />
+        <button id="btnImportCSV" class="rounded-xl border px-3 py-2">Import CSV</button>
+        <button id="btnImportJSON" class="rounded-xl border px-3 py-2">Import JSON</button>
+        <button id="btnEditQcTpl" class="rounded-xl border px-3 py-2">Edit QC Template</button>
+      </div>
+    </section>
+
+    <section class="mt-4">
+      <div class="overflow-auto rounded-2xl border bg-white">
+        <table class="w-full text-sm" id="table">
+          <thead class="bg-gray-100">
+            <tr>
+              <th class="p-3 text-left w-10">Sel</th>
+              <th class="p-3 text-left">Order</th>
+              <th class="p-3 text-left">Customer</th>
+              <th class="p-3 text-left">Item / SKU</th>
+              <th class="p-3 text-left">Specs</th>
+              <th class="p-3 text-left">Qty</th>
+              <th class="p-3 text-left">Price</th>
+              <th class="p-3 text-left">Status</th>
+              <th class="p-3 text-left">Dates</th>
+              <th class="p-3 text-left">Photos</th>
+              <th class="p-3 text-left no-print">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+      <div class="no-print mt-3 flex items-center gap-2">
+        <label class="text-sm">Bulk set status →</label>
+        <select id="bulkStatus" class="rounded-xl border px-3 py-2"></select>
+      </div>
+    </section>
+  </main>
+
+  <!-- Order Modal -->
+  <div id="orderModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
+    <div class="absolute inset-0 bg-black/30" data-close></div>
+    <div class="relative z-10 w-full max-w-6xl rounded-2xl bg-white shadow-xl">
+      <div class="flex items-center justify-between border-b px-4 py-3">
+        <div class="font-medium">Order</div>
+        <button class="rounded-lg border px-2 py-1" data-close>Close</button>
+      </div>
+      <div class="p-4">
+        <form id="orderForm" class="grid gap-4 md:grid-cols-12"></form>
+      </div>
+    </div>
+  </div>
+
+  <!-- QC Template Modal -->
+  <div id="qcTplModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
+    <div class="absolute inset-0 bg-black/30" data-close></div>
+    <div class="relative z-10 w-full max-w-xl rounded-2xl bg-white shadow-xl">
+      <div class="flex items-center justify-between border-b px-4 py-3">
+        <div class="font-medium">QC Template</div>
+        <button class="rounded-lg border px-2 py-1" data-close>Close</button>
+      </div>
+      <div class="p-4">
+        <div id="qcTplList" class="grid gap-2"></div>
+        <div class="mt-3 flex gap-2">
+          <button id="btnAddTplItem" class="flex-1 rounded-lg border px-2 py-1">+ Add Template Item</button>
+          <button id="btnResetTpl" class="flex-1 rounded-lg border px-2 py-1">Reset to Default</button>
+        </div>
+        <div class="mt-3 flex gap-2">
+          <button id="btnSaveTpl" class="flex-1 rounded-xl bg-black text-white px-3 py-2">Save Template</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ====== Data & Utils ======
+    const STATUSES = ["New","In Production","QC Pending","QC Passed","Shipped","Delivered","Cancelled"];
+    const CHANNELS = ["Website","Etsy","Instagram","WhatsApp","Amazon","B2B","Other"];
+    const DEFAULT_QC_ITEMS = [
+      "घाट ठीक है",
+      "स्टोन सही है",
+      "ऑयल/पॉलिश लगा दिया",
+      "सोल्डर/सेटिंग ठीक है",
+      "क्लास्प/लॉक चेक किया",
+      "फिनिशिंग ठीक है",
+      "रोडियम ठीक है",
+      "डिस्पैच/पैकिंग फोटो लिया",
+    ];
+
+    const ORDER_SOURCES = ["K","Anirudh","Website","Others"]; // ऑर्डर कहाँ से आया
+    const DISPATCH_VIA = ["On Point","Sardar","Others"]; // पार्सल कैसे भेजना है
+    const PACKING_READY = ["Haan","Nahi","Adhura"]; // लफ़ाफ़ा तैयार है
+    const HALLMARKS = ["No","14K","18K","10K","9K","925"]; // मार्किंग
+
+    const LS_KEY = 'kj_order_manager_v2_html';
+    const LS_QC_TPL_KEY = 'kj_qc_template_v2_html';
+
+    const $ = sel => document.querySelector(sel);
+    function uid(){ return Math.random().toString(36).slice(2,10) + Date.now().toString(36).slice(-4); }
+    function readLS(key, fallback){ try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : fallback; } catch { return fallback; } }
+    function writeLS(key, value){ localStorage.setItem(key, JSON.stringify(value)); }
+
+    let ORDERS = readLS(LS_KEY, []);
+    let QC_TEMPLATE = readLS(LS_QC_TPL_KEY, DEFAULT_QC_ITEMS);
+    function saveOrders(){ writeLS(LS_KEY, ORDERS); }
+    function saveQCTemplate(){ writeLS(LS_QC_TPL_KEY, QC_TEMPLATE); }
+
+    function escapeCSV(v){ const s = String(v ?? ''); return /[",
+]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s; }
+    function toCSV(rows){ if(!rows.length) return ''; const headers = Object.keys(rows[0]); const lines = [headers.join(',')]; for(const r of rows){ lines.push(headers.map(h => escapeCSV(r[h])).join(',')); } return lines.join('
+'); }
+    function splitCSVLine(line){ const out=[]; let cur=''; let inQ=false; for(let i=0;i<line.length;i++){ const ch=line[i]; if(inQ){ if(ch==='"' && line[i+1]==='"'){ cur+='"'; i++; } else if(ch==='"'){ inQ=false; } else cur+=ch; } else { if(ch===','){ out.push(cur); cur=''; } else if(ch==='"'){ inQ=true; } else cur+=ch; } } out.push(cur); return out; }
+    function fromCSV(text){ const lines=text.split(/?
+/).filter(Boolean); if(!lines.length) return []; const headers=splitCSVLine(lines[0]); return lines.slice(1).map(line=>{ const cells=splitCSVLine(line); const obj={}; headers.forEach((h,i)=>obj[h]=cells[i]??''); return obj; }); }
+
+    function fmtBadge(status){
+      const map={ 'New':'bg-blue-50 text-blue-700','In Production':'bg-purple-50 text-purple-700','QC Pending':'bg-amber-50 text-amber-700','QC Passed':'bg-emerald-50 text-emerald-700','Shipped':'bg-cyan-50 text-cyan-700','Delivered':'bg-green-50 text-green-700','Cancelled':'bg-rose-50 text-rose-700'};
+      return map[status] || 'bg-gray-100 text-gray-700';
+    }
+
+    // ====== Rendering ======
+    function renderFilters(){
+      const fs = $('#filterStatus'); fs.innerHTML = '<option value="">All Statuses</option>' + STATUSES.map(s=>`<option>${s}</option>`).join('');
+      const fc = $('#filterChannel'); fc.innerHTML = '<option value="">All Channels</option>' + CHANNELS.map(s=>`<option>${s}</option>`).join('');
+      const bs = $('#bulkStatus'); bs.innerHTML = '<option value="" disabled selected>Choose status</option>' + STATUSES.map(s=>`<option>${s}</option>`).join('');
+    }
+
+    function rowMatches(o, q, sf, cf){
+      const matchesQ = !q || JSON.stringify(o).toLowerCase().includes(q);
+      const matchesS = !sf || o.status === sf;
+      const matchesC = !cf || o.channel === cf;
+      return matchesQ && matchesS && matchesC;
+    }
+
+    function renderTable(){
+      const q = document.getElementById('search').value.trim().toLowerCase();
+      const sf = document.getElementById('filterStatus').value; const cf = document.getElementById('filterChannel').value;
+      const tbody = document.getElementById('tbody'); tbody.innerHTML = '';
+      const rows = ORDERS.filter(o=>rowMatches(o, q, sf, cf));
+      if(!rows.length){ tbody.innerHTML = `<tr><td class=\"p-6 text-center text-gray-500\" colspan=\"11\">No orders yet. Click \"Add Blank\" or \"Add From QC Template\" to get started.</td></tr>`; return; }
+      for(const o of rows){
+        const tr = document.createElement('tr'); tr.className='border-t hover:bg-gray-50';
+        tr.innerHTML = `
+          <td class=\"p-3\"><input type=\"checkbox\" data-check=\"${o.id}\" ${o._checked?'checked':''}></td>
+          <td class=\"p-3\"><div class=\"font-medium\">${o.orderId || o.id.slice(-6)}</div><div class=\"text-xs text-gray-500\">${o.channel||''}</div></td>
+          <td class=\"p-3\"><div class=\"font-medium\">${o.customer||''}</div><div class=\"text-xs text-gray-500\">${o.email||o.phone||''}</div></td>
+          <td class=\"p-3\"><div>${o.item||''}</div><div class=\"text-xs text-gray-500\">${o.sku||''}</div></td>
+          <td class=\"p-3 text-xs\">${[o.metal,o.stone,o.size].filter(Boolean).join(' • ')}</td>
+          <td class=\"p-3\">${o.qty||1}</td>
+          <td class=\"p-3\">${o.currency||''} ${o.price||''}</td>
+          <td class=\"p-3\"><span class=\"inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${fmtBadge(o.status)}\">${o.status}</span></td>
+          <td class=\"p-3 text-xs\"><div>Order: ${o.orderDate||''}</div><div>Due: ${o.dueDate||''}</div></td>
+          <td class=\"p-3 text-xs\"><div>Order: ${(o.orderPhotos||[]).length} • Parcel: ${(o.parcelPhotos||[]).length}</div></td>
+          <td class=\"p-3 no-print flex flex-wrap gap-2\">
+            <button class=\"rounded-lg border px-2 py-1\" data-edit=\"${o.id}\">Edit</button>
+            <button class=\"rounded-lg border px-2 py-1\" data-print=\"${o.id}\">Print</button>
+            <button class=\"rounded-lg border px-2 py-1\" data-del=\"${o.id}\">Delete</button>
+          </td>`;
+        tbody.appendChild(tr);
+      }
+    }
+
+    // ====== CRUD ======
+    function blankOrder(){
+      return {
+        id: uid(), orderId:'', channel:'Website', customer:'', email:'', phone:'', country:'',
+        item:'', sku:'', metal:'', stone:'', size:'', price:'', currency:'USD', qty:1,
+        status:'New', orderDate: new Date().toISOString().slice(0,10), dueDate:'', imageUrl:'', notes:'',
+        // Extra Hindi/KJ fields
+        orderSource:'', dispatchVia:'', packingReady:'', remarks:'', qcHandover:false, qcDate:'', ringSize:'', itemCount:'', hallmark:'',
+        // Photos
+        orderPhotos:[], parcelPhotos:[],
+        qcChecklist: []
+      };
+    }
+
+    function orderFromTemplate(){
+      const o = blankOrder();
+      o.qcChecklist = QC_TEMPLATE.map(t=>({id:uid(), label:t, done:false, note:''}));
+      return o;
+    }
+
+    function openOrderModal(order){
+      const modal = document.getElementById('orderModal'); const form = document.getElementById('orderForm');
+      modal.classList.remove('hidden'); modal.classList.add('flex');
+      form.innerHTML = '';
+
+      // --- Core fields ---
+      const fields = [
+        ['Order ID','orderId','text','md:col-span-3'],
+        ['Channel','channel','select:CHANNELS','md:col-span-3'],
+        ['Status','status','select:STATUSES','md:col-span-3'],
+        ['Customer Name','customer','text','md:col-span-3'],
+        ['Email','email','email','md:col-span-3'],
+        ['Phone','phone','text','md:col-span-3'],
+        ['Country','country','text','md:col-span-3'],
+        ['Item Name','item','text','md:col-span-4'],
+        ['SKU','sku','text','md:col-span-2'],
+        ['Metal','metal','text','md:col-span-2'],
+        ['Stone','stone','text','md:col-span-2'],
+        ['Size','size','text','md:col-span-2'],
+        ['Qty','qty','number','md:col-span-2'],
+        ['Currency','currency','text','md:col-span-2'],
+        ['Price','price','text','md:col-span-2'],
+        ['Order Date','orderDate','date','md:col-span-2'],
+        ['Due Date','dueDate','date','md:col-span-2'],
+      ];
+      for(const [label,key,type,span] of fields){
+        const wrap = document.createElement('div'); wrap.className = `${span||''}`; wrap.innerHTML = `<label class="text-xs text-gray-600 block mb-1">${label}</label>`;
+        let input;
+        if(type.startsWith('select:')){ const src = (type.endsWith('STATUSES')?STATUSES:CHANNELS); input = document.createElement('select'); input.className='w-full rounded-xl border px-3 py-2'; input.innerHTML = src.map(v=>`<option ${order[key]===v?'selected':''}>${v}</option>`).join(''); }
+        else { input = document.createElement('input'); input.type = type; input.className='w-full rounded-xl border px-3 py-2'; input.value = order[key] ?? ''; }
+        input.name = key; wrap.appendChild(input); form.appendChild(wrap);
+      }
+
+      // --- Hindi process block ---
+      const process = document.createElement('div'); process.className='md:col-span-8 rounded-2xl border p-3 bg-rose-50';
+      process.innerHTML = `
+        <div class="grid md:grid-cols-3 gap-3">
+          <div>
+            <div class="text-sm font-medium mb-1">ऑर्डर कहाँ से आया है</div>
+            ${ORDER_SOURCES.map(v=>`<label class='flex items-center gap-2 text-sm'><input type='radio' name='orderSource' value='${v}' ${order.orderSource===v?'checked':''}/> ${v}</label>`).join('')}
+          </div>
+          <div>
+            <div class="text-sm font-medium mb-1">पार्सल कैसे भेजना है</div>
+            ${DISPATCH_VIA.map(v=>`<label class='flex items-center gap-2 text-sm'><input type='radio' name='dispatchVia' value='${v}' ${order.dispatchVia===v?'checked':''}/> ${v}</label>`).join('')}
+          </div>
+          <div>
+            <div class="text-sm font-medium mb-1">लफ़ाफ़ा तैयार है</div>
+            ${PACKING_READY.map(v=>`<label class='flex items-center gap-2 text-sm'><input type='radio' name='packingReady' value='${v}' ${order.packingReady===v?'checked':''}/> ${v}</label>`).join('')}
+          </div>
+        </div>
+        <div class="mt-3">
+          <label class="text-sm font-medium">Remarks / टिप्पणी</label>
+          <textarea name="remarks" rows="3" class="w-full rounded-xl border px-3 py-2 mt-1">${order.remarks||''}</textarea>
+        </div>
+        <div class="mt-3 grid md:grid-cols-3 gap-3 items-end">
+          <div>
+            <label class="text-sm font-medium">Agar Ready Hai Toh QC Par Bhej Diya:</label>
+            <label class='flex items-center gap-2 text-sm mt-2'><input type='checkbox' name='qcHandover' ${order.qcHandover?'checked':''}/> हाँ</label>
+          </div>
+          <div>
+            <label class="text-sm font-medium">Date</label>
+            <input type="date" name="qcDate" value="${order.qcDate||''}" class="w-full rounded-xl border px-3 py-2"/>
+          </div>
+          <div>
+            <label class="text-sm font-medium">Ring Size / सामान की गिनती</label>
+            <div class="flex gap-2">
+              <input name="ringSize" value="${order.ringSize||''}" placeholder="Ring size" class="flex-1 rounded-xl border px-3 py-2"/>
+              <input name="itemCount" value="${order.itemCount||''}" placeholder="Count" class="w-28 rounded-xl border px-3 py-2"/>
+            </div>
+          </div>
+        </div>
+        <div class="mt-3">
+          <div class="text-sm font-medium mb-1">मार्किंग</div>
+          <div class="flex flex-wrap gap-4">
+            ${HALLMARKS.map(v=>`<label class='flex items-center gap-2 text-sm'><input type='radio' name='hallmark' value='${v}' ${order.hallmark===v?'checked':''}/> ${v}</label>`).join('')}
+          </div>
+        </div>
+      `;
+      form.appendChild(process);
+
+      // --- Notes ---
+      const notes = document.createElement('div'); notes.className='md:col-span-8';
+      notes.innerHTML = `<label class="text-xs text-gray-600 block mb-1">Notes</label><textarea name="notes" rows="3" class="w-full rounded-xl border px-3 py-2">${order.notes||''}</textarea>`;
+      form.appendChild(notes);
+
+      // --- Side: Photos + QC ---
+      const side = document.createElement('div'); side.className='md:col-span-4 grid gap-4';
+      side.innerHTML = `
+        <div class="rounded-2xl border p-3">
+          <div class="text-sm font-semibold">Order Photos</div>
+          <div class="text-xs text-gray-500">Add product or WIP pictures. Saved locally.</div>
+          <div id="orderPhotos" class="mt-2 flex flex-wrap gap-2"></div>
+          <div class="mt-2 flex gap-2">
+            <input type="file" id="fileOrderPhoto" accept="image/*" capture="environment" class="hidden"/>
+            <button type="button" class="rounded-lg border px-2 py-1" id="btnAddOrderPhoto">+ Add Photo</button>
+          </div>
+        </div>
+        <div class="rounded-2xl border p-3">
+          <div class="text-sm font-semibold">Parcel Photos (Dispatch)</div>
+          <div class="text-xs text-gray-500">Dispatcher can add parcel images.</div>
+          <div id="parcelPhotos" class="mt-2 flex flex-wrap gap-2"></div>
+          <div class="mt-2 flex gap-2">
+            <input type="file" id="fileParcelPhoto" accept="image/*" capture="environment" class="hidden"/>
+            <button type="button" class="rounded-lg border px-2 py-1" id="btnAddParcelPhoto">+ Add Photo</button>
+          </div>
+        </div>
+        <div class="rounded-2xl border p-3">
+          <div class="text-sm font-medium mb-2">QC Checklist</div>
+          <div id="qcList" class="grid gap-2"></div>
+          <button type="button" id="btnAddQC" class="rounded-lg border px-2 py-1 mt-2">+ Add QC Item</button>
+          <div class="mt-2 text-xs text-gray-500">Tick during inspection; labels editable per order.</div>
+        </div>
+        <div class="flex gap-2">
+          <button id="btnSaveOrder" class="flex-1 rounded-xl bg-black text-white px-3 py-2" type="button">Save</button>
+          <button id="btnPrintForm" class="flex-1 rounded-xl border px-3 py-2" type="button">Print</button>
+        </div>`;
+      form.appendChild(side);
+
+      // Thumbnails renderers
+      const orderWrap = form.querySelector('#orderPhotos');
+      const parcelWrap = form.querySelector('#parcelPhotos');
+      function makeThumb(src, arr, idx){
+        const d = document.createElement('div'); d.className = 'relative';
+        d.innerHTML = `<img class="thumb" src="${src}"><button type='button' class='absolute -top-2 -right-2 bg-white border rounded-full w-6 h-6 text-xs' data-x='${idx}'>×</button>`;
+        d.querySelector('button').onclick = ()=>{ arr.splice(idx,1); renderPhotos(); };
+        return d;
+      }
+      function renderPhotos(){
+        orderWrap.innerHTML=''; parcelWrap.innerHTML='';
+        (order.orderPhotos||[]).forEach((src,i)=> orderWrap.appendChild(makeThumb(src, order.orderPhotos, i)));
+        (order.parcelPhotos||[]).forEach((src,i)=> parcelWrap.appendChild(makeThumb(src, order.parcelPhotos, i)));
+      }
+      renderPhotos();
+
+      // File adders
+      form.querySelector('#btnAddOrderPhoto').onclick = ()=> form.querySelector('#fileOrderPhoto').click();
+      form.querySelector('#btnAddParcelPhoto').onclick = ()=> form.querySelector('#fileParcelPhoto').click();
+      form.querySelector('#fileOrderPhoto').onchange = (e)=> readImages(e.target.files, urls=>{ order.orderPhotos = (order.orderPhotos||[]).concat(urls); renderPhotos(); e.target.value=''; });
+      form.querySelector('#fileParcelPhoto').onchange = (e)=> readImages(e.target.files, urls=>{ order.parcelPhotos = (order.parcelPhotos||[]).concat(urls); renderPhotos(); e.target.value=''; });
+
+      // Render QC items
+      const qcWrap = form.querySelector('#qcList');
+      function renderQC(){
+        qcWrap.innerHTML = '';
+        (order.qcChecklist||[]).forEach((it, i)=>{
+          const row = document.createElement('div'); row.className='flex items-start gap-2';
+          row.innerHTML = `
+            <input type=\"checkbox\" class=\"mt-1\" ${it.done?'checked':''} data-qc=\"${i}\"> 
+            <input class=\"flex-1 rounded-xl border px-3 py-2\" value=\"${it.label}\" data-qclabel=\"${i}\"> 
+            <button type=\"button\" class=\"rounded-lg border px-2 py-1\" data-qcdel=\"${i}\">Remove</button>`;
+          qcWrap.appendChild(row);
+        });
+      }
+      renderQC();
+
+      qcWrap.addEventListener('change', (e)=>{ if(e.target.matches('[data-qc]')){ const i = +e.target.getAttribute('data-qc'); order.qcChecklist[i].done = e.target.checked; } });
+      qcWrap.addEventListener('input', (e)=>{ if(e.target.matches('[data-qclabel]')){ const i = +e.target.getAttribute('data-qclabel'); order.qcChecklist[i].label = e.target.value; } });
+      qcWrap.addEventListener('click', (e)=>{ if(e.target.matches('[data-qcdel]')){ const i=+e.target.getAttribute('data-qcdel'); order.qcChecklist.splice(i,1); renderQC(); } });
+      form.querySelector('#btnAddQC').onclick = ()=>{ order.qcChecklist.push({id:uid(), label:'Custom QC', done:false, note:''}); renderQC(); };
+
+      // Save/Print actions
+      form.querySelector('#btnSaveOrder').onclick = ()=>{
+        const fd = new FormData(form); for(const [k,v] of fd.entries()){ if(k==='qty') order[k]=Number(v||1); else if(k==='qcHandover') order[k]=true; else order[k]=v; }
+        if(!fd.has('qcHandover')) order.qcHandover = false;
+        const idx = ORDERS.findIndex(x=>x.id===order.id);
+        if(idx>=0) ORDERS[idx] = order; else ORDERS.unshift(order);
+        saveOrders(); closeOrderModal(); renderTable();
+      };
+      form.querySelector('#btnPrintForm').onclick = ()=>{ printJobSheet(order); };
+
+      modal.addEventListener('click', (e)=>{ if(e.target.hasAttribute('data-close')) closeOrderModal(); });
+    }
+
+    function closeOrderModal(){ const modal=document.getElementById('orderModal'); modal.classList.add('hidden'); modal.classList.remove('flex'); }
+
+    // ====== Image helpers (local, base64) ======
+    function readImages(fileList, cb){
+      const files = Array.from(fileList || []); if(!files.length) return;
+      const urls = []; let left = files.length;
+      files.forEach(f=>{ const r=new FileReader(); r.onload=()=>{ urls.push(String(r.result)); if(--left===0) cb(urls); }; r.readAsDataURL(f); });
+    }
+
+    // ====== Print ======
+    function printJobSheet(o){
+      const w = window.open('', '_blank'); if(!w) return;
+      const qc = (o.qcChecklist||[]).map(it=>`<li>${it.label}: <strong>${it.done?'✔':'✖'}</strong></li>`).join('');
+      const orderImgs = (o.orderPhotos||[]).slice(0,6).map(src=>`<img src='${src}' style='max-width:90px;border-radius:8px;margin:4px;border:1px solid #ddd'>`).join('');
+      const parcelImgs = (o.parcelPhotos||[]).slice(0,6).map(src=>`<img src='${src}' style='max-width:90px;border-radius:8px;margin:4px;border:1px solid #ddd'>`).join('');
+      w.document.write(`
+        <html><head><title>Job Sheet</title>
+        <style>body{font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; padding:24px;}h1{font-size:20px;margin:0 0 12px}table{width:100%;border-collapse:collapse;margin-top:8px}td,th{border:1px solid #ddd;padding:8px;text-align:left;font-size:14px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}</style>
+        </head><body>
+        <h1>Order Job Sheet — ${o.orderId || o.id}</h1>
+        <div class="grid">
+          <div>
+            <table>
+              <tr><th>Channel</th><td>${o.channel||''}</td></tr>
+              <tr><th>Customer</th><td>${o.customer||''}</td></tr>
+              <tr><th>Contact</th><td>${o.email||''} ${o.phone?(' / '+o.phone):''}</td></tr>
+              <tr><th>Item</th><td>${o.item||''} (${o.sku||''})</td></tr>
+              <tr><th>Specs</th><td>${[o.metal,o.stone,o.size].filter(Boolean).join(' • ')}</td></tr>
+              <tr><th>Qty</th><td>${o.qty||1}</td></tr>
+              <tr><th>Price</th><td>${o.currency||''} ${o.price||''}</td></tr>
+              <tr><th>Status</th><td>${o.status||''}</td></tr>
+              <tr><th>Dates</th><td>Order: ${o.orderDate||''} • Due: ${o.dueDate||''}</td></tr>
+              <tr><th>Remarks</th><td>${o.remarks||''}</td></tr>
+              <tr><th>Order Source</th><td>${o.orderSource||''}</td></tr>
+              <tr><th>Dispatch Via</th><td>${o.dispatchVia||''}</td></tr>
+              <tr><th>Packing Ready</th><td>${o.packingReady||''}</td></tr>
+              <tr><th>QC Handover</th><td>${o.qcHandover?'Yes':''} ${o.qcDate?(' • '+o.qcDate):''}</td></tr>
+              <tr><th>Ring Size / Count</th><td>${o.ringSize||''} • ${o.itemCount||''}</td></tr>
+              <tr><th>Marking</th><td>${o.hallmark||''}</td></tr>
+            </table>
+          </div>
+          <div>
+            <h3>QC Checklist</h3>
+            <ul>${qc}</ul>
+            <h3>Order Photos</h3>
+            <div>${orderImgs}</div>
+            <h3>Parcel Photos</h3>
+            <div>${parcelImgs}</div>
+          </div>
+        </div>
+        <script>window.onload=()=>window.print()<\/script>
+        </body></html>`);
+      w.document.close(); w.focus();
+    }
+
+    // ====== Events ======
+    function attachEvents(){
+      document.getElementById('btnAddBlank').onclick = ()=> openOrderModal(blankOrder());
+      document.getElementById('btnAddTemplate').onclick = ()=> openOrderModal(orderFromTemplate());
+
+      document.getElementById('search').oninput = renderTable;
+      document.getElementById('filterStatus').onchange = renderTable;
+      document.getElementById('filterChannel').onchange = renderTable;
+
+      document.getElementById('tbody').addEventListener('change', (e)=>{
+        if(e.target.matches('[data-check]')){
+          const id = e.target.getAttribute('data-check'); const o = ORDERS.find(x=>x.id===id); if(o){ o._checked = e.target.checked; saveOrders(); }
+        }
+      });
+
+      document.getElementById('tbody').addEventListener('click', (e)=>{
+        const id = e.target.getAttribute('data-edit'); if(id){ const o=ORDERS.find(x=>x.id===id); if(o) openOrderModal(JSON.parse(JSON.stringify(o))); return; }
+        const pid = e.target.getAttribute('data-print'); if(pid){ const o=ORDERS.find(x=>x.id===pid); if(o) printJobSheet(o); return; }
+        const did = e.target.getAttribute('data-del'); if(did){ if(confirm('Delete this order?')){ ORDERS = ORDERS.filter(x=>x.id!==did); saveOrders(); renderTable(); } }
+      });
+
+      document.getElementById('bulkStatus').onchange = (e)=>{
+        const val = e.target.value; if(!val) return; const ids = ORDERS.filter(o=>o._checked).map(o=>o.id); if(!ids.length){ alert('Select at least one row (checkbox).'); return; }
+        ORDERS = ORDERS.map(o=> ids.includes(o.id) ? { ...o, status: val } : o); saveOrders(); renderTable(); e.target.value='';
+      };
+
+      document.getElementById('btnExportCSV').onclick = ()=>{
+        const rows = ORDERS.map(o=>({
+          id:o.id, orderId:o.orderId, channel:o.channel, customer:o.customer, email:o.email, phone:o.phone, country:o.country,
+          item:o.item, sku:o.sku, metal:o.metal, stone:o.stone, size:o.size, price:o.price, currency:o.currency, qty:o.qty,
+          status:o.status, orderDate:o.orderDate, dueDate:o.dueDate, imageUrl:o.imageUrl, notes:o.notes,
+          orderSource:o.orderSource, dispatchVia:o.dispatchVia, packingReady:o.packingReady, remarks:o.remarks, qcHandover:o.qcHandover, qcDate:o.qcDate, ringSize:o.ringSize, itemCount:o.itemCount, hallmark:o.hallmark,
+          orderPhotos: JSON.stringify(o.orderPhotos||[]), parcelPhotos: JSON.stringify(o.parcelPhotos||[]),
+          qcChecklist: JSON.stringify(o.qcChecklist||[])
+        }));
+        const blob = new Blob([toCSV(rows)], {type:'text/csv;charset=utf-8;'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='orders.csv'; a.click();
+      };
+
+      document.getElementById('btnExportJSON').onclick = ()=>{
+        const blob = new Blob([JSON.stringify(ORDERS, null, 2)], {type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='orders.json'; a.click();
+      };
+
+      document.getElementById('btnImportCSV').onclick = ()=> document.getElementById('fileCSV').click();
+      document.getElementById('btnImportJSON').onclick = ()=> document.getElementById('fileJSON').click();
+      document.getElementById('fileCSV').onchange = (e)=>{ const f=e.target.files?.[0]; if(!f) return; const r=new FileReader(); r.onload=()=>{ const rows=fromCSV(String(r.result)); const mapped=rows.map(r=>({
+            id:r.id||uid(), orderId:r.orderId||'', channel:r.channel||'Other', customer:r.customer||'', email:r.email||'', phone:r.phone||'', country:r.country||'', item:r.item||'', sku:r.sku||'', metal:r.metal||'', stone:r.stone||'', size:r.size||'', price:r.price||'', currency:r.currency||'USD', qty:Number(r.qty||1), status:r.status||'New', orderDate:r.orderDate||new Date().toISOString().slice(0,10), dueDate:r.dueDate||'', imageUrl:r.imageUrl||'', notes:r.notes||'', orderSource:r.orderSource||'', dispatchVia:r.dispatchVia||'', packingReady:r.packingReady||'', remarks:r.remarks||'', qcHandover:(r.qcHandover==='true'||r.qcHandover===true), qcDate:r.qcDate||'', ringSize:r.ringSize||'', itemCount:r.itemCount||'', hallmark:r.hallmark||'', orderPhotos:safeParse(r.orderPhotos,[]), parcelPhotos:safeParse(r.parcelPhotos,[]), qcChecklist:safeParse(r.qcChecklist,[])
+        })); ORDERS = [...mapped, ...ORDERS]; saveOrders(); renderTable(); }; r.readAsText(f); };
+      document.getElementById('fileJSON').onchange = (e)=>{ const f=e.target.files?.[0]; if(!f) return; const r=new FileReader(); r.onload=()=>{ try{ const data=JSON.parse(String(r.result)); if(!Array.isArray(data)) throw new Error('Invalid JSON'); ORDERS=[...data, ...ORDERS]; saveOrders(); renderTable(); }catch{ alert('Invalid JSON file'); } }; r.readAsText(f); };
+
+      // QC Template editor
+      document.getElementById('btnEditQcTpl').onclick = ()=> openQcTplModal();
+    }
+
+    function safeParse(s, fb){ try{ return JSON.parse(s); }catch{ return fb; } }
+
+    // ====== QC Template Modal ======
+    function openQcTplModal(){
+      const modal = document.getElementById('qcTplModal'); const list = document.getElementById('qcTplList');
+      modal.classList.remove('hidden'); modal.classList.add('flex');
+      render();
+      function render(){ list.innerHTML = QC_TEMPLATE.map((t,i)=>`
+        <div class=\"flex gap-2\">
+          <input class=\"flex-1 rounded-xl border px-3 py-2\" value=\"${t}\" data-i=\"${i}\">
+          <button class=\"rounded-lg border px-2 py-1\" data-del=\"${i}\">Remove</button>
+        </div>`).join(''); }
+      list.oninput = (e)=>{ const i = +e.target.getAttribute('data-i'); if(Number.isInteger(i)) QC_TEMPLATE[i] = e.target.value; };
+      list.onclick = (e)=>{ const i = e.target.getAttribute('data-del'); if(i!==null){ QC_TEMPLATE.splice(+i,1); render(); } };
+      document.getElementById('btnAddTplItem').onclick = ()=>{ QC_TEMPLATE.push('New QC Item'); render(); };
+      document.getElementById('btnResetTpl').onclick = ()=>{ QC_TEMPLATE = DEFAULT_QC_ITEMS.slice(); render(); };
+      document.getElementById('btnSaveTpl').onclick = ()=>{ QC_TEMPLATE = QC_TEMPLATE.filter(s=>s.trim()); saveQCTemplate(); closeQcTplModal(); };
+      modal.addEventListener('click', (e)=>{ if(e.target.hasAttribute('data-close')) closeQcTplModal(); });
+    }
+    function closeQcTplModal(){ const modal=document.getElementById('qcTplModal'); modal.classList.add('hidden'); modal.classList.remove('flex'); }
+
+    // ====== Init ======
+    function initFilters(){
+      const fs = document.getElementById('filterStatus'); fs.innerHTML = '<option value="">All Statuses</option>' + STATUSES.map(s=>`<option>${s}</option>`).join('');
+      const fc = document.getElementById('filterChannel'); fc.innerHTML = '<option value="">All Channels</option>' + CHANNELS.map(s=>`<option>${s}</option>`).join('');
+      const bs = document.getElementById('bulkStatus'); bs.innerHTML = '<option value="" disabled selected>Choose status</option>' + STATUSES.map(s=>`<option>${s}</option>`).join('');
+    }
+    initFilters(); attachEvents(); renderTable();
+  </script>
+</body>
+</html>
