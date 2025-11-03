@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>KJ Orders – Simple Intake/Production/QC</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 text-gray-900">
+  <div class="max-w-4xl mx-auto p-4">
+    <h1 class="text-xl font-semibold">KJ Orders</h1>
+    <p class="text-xs text-gray-500 mb-4">Intake → Production → QC/Dispatch (Firebase)</p>
+
+    <!-- Tabs -->
+    <div class="flex gap-2 mb-3">
+      <button class="tab px-3 py-2 border rounded bg-black text-white" data-tab="intake">1) Intake</button>
+      <button class="tab px-3 py-2 border rounded bg-white" data-tab="production">2) Production</button>
+      <button class="tab px-3 py-2 border rounded bg-white" data-tab="qc">3) QC</button>
+      <span class="ml-auto text-xs text-gray-500" id="whoami"></span>
+    </div>
+
+    <!-- Intake -->
+    <section id="view-intake" class="border rounded-xl bg-white p-3">
+      <h2 class="font-medium mb-2">Add order</h2>
+      <form id="formIntake" class="grid sm:grid-cols-2 gap-3">
+        <div>
+          <label class="text-xs text-gray-600">Order ID</label>
+          <input name="orderId" required class="w-full border rounded px-3 py-2" placeholder="KJ-2025-001">
+        </div>
+        <div>
+          <label class="text-xs text-gray-600">Customer</label>
+          <input name="customer" required class="w-full border rounded px-3 py-2">
+        </div>
+        <div>
+          <label class="text-xs text-gray-600">Source</label>
+          <select name="source" class="w-full border rounded px-3 py-2">
+            <option>K Etsy</option>
+            <option>Anirudh Etsy</option>
+            <option>Website</option>
+            <option>Others</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs text-gray-600">Order photo (optional)</label>
+          <input id="photo" type="file" accept="image/*" class="w-full border rounded px-3 py-2">
+        </div>
+        <div class="sm:col-span-2">
+          <button class="px-3 py-2 bg-black text-white rounded" type="submit">Add Order</button>
+        </div>
+      </form>
+
+      <h3 class="mt-4 font-medium">Recent orders</h3>
+      <table class="w-full text-sm mt-1" id="tblIntake">
+        <thead class="bg-gray-100">
+          <tr><th class="p-2 text-left">Order</th><th class="p-2 text-left">Customer</th><th class="p-2 text-left">Source</th><th class="p-2 text-left">Status</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </section>
+
+    <!-- Production -->
+    <section id="view-production" class="border rounded-xl bg-white p-3 hidden">
+      <h2 class="font-medium mb-2">Mark stock / artisan</h2>
+      <table class="w-full text-sm" id="tblProd">
+        <thead class="bg-gray-100"><tr>
+          <th class="p-2 text-left">Order</th>
+          <th class="p-2">Stock?</th>
+          <th class="p-2">Give to artisan?</th>
+          <th class="p-2">Save</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </section>
+
+    <!-- QC -->
+    <section id="view-qc" class="border rounded-xl bg-white p-3 hidden">
+      <h2 class="font-medium mb-2">QC / Dispatch</h2>
+      <table class="w-full text-sm" id="tblQC">
+        <thead class="bg-gray-100"><tr>
+          <th class="p-2 text-left">Order</th>
+          <th class="p-2">Parcel photo</th>
+          <th class="p-2">Tracking</th>
+          <th class="p-2">Actions</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </section>
+  </div>
+
+  <!-- Firebase (modules) -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+    import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
+    import { getFirestore, collection, addDoc, doc, onSnapshot, orderBy, query, serverTimestamp, updateDoc } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+    import { getStorage, ref as sRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-storage.js";
+
+    // Your Firebase config (from your project)
+    const firebaseConfig = {
+      apiKey: "AIzaSyCcFWt73v5_fq2nqvCTkxh98Zd48ZesllY",
+      authDomain: "order-management-portal-edc78.firebaseapp.com",
+      projectId: "order-management-portal-edc78",
+      storageBucket: "order-management-portal-edc78.appspot.com",
+      messagingSenderId: "1064944592307",
+      appId: "1:1064944592307:web:d985383a3d47e097b357c6"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const storage = getStorage(app);
+
+    // Tabs
+    const tabs = document.querySelectorAll('.tab');
+    const views = { intake: '#view-intake', production: '#view-production', qc: '#view-qc' };
+    function show(id){ Object.values(views).forEach(s=>document.querySelector(s).classList.add('hidden')); document.querySelector(views[id]).classList.remove('hidden'); tabs.forEach(b=>{ b.classList.toggle('bg-black', b.dataset.tab===id); b.classList.toggle('text-white', b.dataset.tab===id); });}
+    tabs.forEach(b=> b.onclick = ()=> show(b.dataset.tab));
+
+    // Auth
+    signInAnonymously(auth);
+    onAuthStateChanged(auth, u => { document.getElementById('whoami').textContent = u ? 'Signed in (anon)' : 'Not signed in'; });
+
+    // Collections & helpers
+    const ORDERS = collection(db, 'orders');
+    const STATUS = { NEW:'New', PROD:'In Production', QCP:'QC Pending', SHIP:'Shipped' };
+    const $ = sel => document.querySelector(sel);
+    const el = html => { const t=document.createElement('template'); t.innerHTML=html.trim(); return t.content.firstChild; };
+
+    // Intake: add order
+    const form = $('#formIntake'); const photo = $('#photo');
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      const fd = new FormData(form);
+      const data = {
+        orderId: fd.get('orderId'), customer: fd.get('customer'), source: fd.get('source'),
+        status: STATUS.NEW, createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+        intakePhotos: [], prod:{ inStock:false, giveToArtisan:false }, qc:{ tracking:'', parcelPhotos:[] }
+      };
+      const ref = await addDoc(ORDERS, data);
+
+      const f = photo.files?.[0];
+      if (f) {
+        const path = `orders/${ref.id}/intake_${Date.now()}_${f.name}`;
+        await uploadBytes(sRef(storage, path), f);
+        const url = await getDownloadURL(sRef(storage, path));
+        await updateDoc(doc(db,'orders',ref.id), { intakePhotos:[url], updatedAt: serverTimestamp() });
+      }
+      form.reset();
+      alert('Order added');
+    };
+
+    // Live tables
+    const q = query(ORDERS, orderBy('createdAt','desc'));
+    onSnapshot(q, snap => {
+      // Intake list
+      const tbI = $('#tblIntake tbody'); tbI.innerHTML='';
+      // Production
+      const tbP = $('#tblProd tbody'); tbP.innerHTML='';
+      // QC
+      const tbQ = $('#tblQC tbody'); tbQ.innerHTML='';
+
+      snap.forEach(d => {
+        const o = { id: d.id, ...d.data() };
+
+        tbI.appendChild(el(`<tr>
+          <td class="p-2">${o.orderId||''}</td>
+          <td class="p-2">${o.customer||''}</td>
+          <td class="p-2">${o.source||''}</td>
+          <td class="p-2">${o.status}</td>
+        </tr>`));
+
+        if (o.status===STATUS.NEW || o.status===STATUS.PROD){
+          const r = el(`<tr>
+            <td class="p-2">${o.orderId}</td>
+            <td class="p-2"><input type="checkbox" ${o.prod?.inStock?'checked':''} data-k="inStock"></td>
+            <td class="p-2"><input type="checkbox" ${o.prod?.giveToArtisan?'checked':''} data-k="giveToArtisan"></td>
+            <td class="p-2"><button class="border rounded px-2 py-1">Save</button></td>
+          </tr>`);
+          r.querySelector('button').onclick = async ()=>{
+            const inStock = r.querySelector('[data-k="inStock"]').checked;
+            const giveToArtisan = r.querySelector('[data-k="giveToArtisan"]').checked;
+            const next = giveToArtisan ? STATUS.PROD : (inStock ? STATUS.QCP : STATUS.NEW);
+            await updateDoc(doc(db,'orders',o.id), { prod:{inStock,giveToArtisan}, status: next, updatedAt: serverTimestamp() });
+            alert('Saved');
+          };
+          tbP.appendChild(r);
+        }
+
+        if (o.status===STATUS.PROD || o.status===STATUS.QCP){
+          const r = el(`<tr>
+            <td class="p-2">${o.orderId}</td>
+            <td class="p-2"><input type="file" class="file border rounded px-2 py-1" accept="image/*"></td>
+            <td class="p-2"><input value="${o.qc?.tracking||''}" class="track border rounded px-2 py-1"></td>
+            <td class="p-2">
+              <button class="save border rounded px-2 py-1 mr-1">Save</button>
+              <button class="ship bg-black text-white rounded px-2 py-1">Approve & Ship</button>
+            </td>
+          </tr>`);
+          r.querySelector('.file').onchange = async (e)=>{
+            const f = e.target.files?.[0]; if(!f) return;
+            const path = `orders/${o.id}/parcel_${Date.now()}_${f.name}`;
+            await uploadBytes(sRef(storage, path), f);
+            const url = await getDownloadURL(sRef(storage, path));
+            const photos = (o.qc?.parcelPhotos||[]).concat(url);
+            await updateDoc(doc(db,'orders',o.id), { 'qc.parcelPhotos': photos, status: STATUS.QCP, updatedAt: serverTimestamp() });
+            alert('Photo added');
+          };
+          r.querySelector('.save').onclick = async ()=>{
+            const tracking = r.querySelector('.track').value;
+            await updateDoc(doc(db,'orders',o.id), { qc:{ ...(o.qc||{}), tracking }, status: STATUS.QCP, updatedAt: serverTimestamp() });
+            alert('QC saved');
+          };
+          r.querySelector('.ship').onclick = async ()=>{
+            await updateDoc(doc(db,'orders',o.id), { status: STATUS.SHIP, updatedAt: serverTimestamp() });
+            alert('Shipped');
+          };
+          tbQ.appendChild(r);
+        }
+      });
+    });
+
+    // Default view
+    show('intake');
+  </script>
+</body>
+</html>
