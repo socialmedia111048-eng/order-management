@@ -41,7 +41,7 @@
       </div>
     </nav>
 
-    <!-- Diagnostics (bucket check + storage test) -->
+    <!-- Diagnostics -->
     <section id="diag" class="card mb-3">
       <div class="flex items-center justify-between gap-3">
         <div>
@@ -162,7 +162,10 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
     import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
-    import { getFirestore, collection, addDoc, doc, onSnapshot, orderBy, query, serverTimestamp, updateDoc, where, getDocs } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+    import {
+      getFirestore, collection, addDoc, doc, onSnapshot, orderBy, query,
+      serverTimestamp, updateDoc, where, getDocs, arrayUnion
+    } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
     import { getStorage, ref as sRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-storage.js";
 
     // ✅ YOUR PROJECT (fixed bucket .appspot.com)
@@ -170,7 +173,7 @@
       apiKey: "AIzaSyCcFWt73v5_fq2nqvCTkxh98Zd48ZesllY",
       authDomain: "order-management-portal-edc78.firebaseapp.com",
       projectId: "order-management-portal-edc78",
-      storageBucket: "order-management-portal-edc78.appspot.com",   // ← correct
+      storageBucket: "order-management-portal-edc78.appspot.com",
       messagingSenderId: "1064944592307",
       appId: "1:1064944592307:web:d985383a3d47e097b357c6"
     };
@@ -332,16 +335,52 @@
                     : o.status===STATUS.SHIP ? 'bg-emerald-100 text-emerald-800'
                     : 'bg-rose-100 text-rose-800';
 
-        // Dashboard
-        dashTbody.appendChild(el(`<tr>
-          <td class="p-2"><div class="flex gap-2">${pics.length?pics.map(u=>`<a href="${u}" target="_blank"><img class="thumb" src="${u}"></a>`).join(''):'-'}</div></td>
+        // Dashboard row (includes "Add photo" for old orders)
+        const row = el(`<tr>
+          <td class="p-2">
+            <div class="flex gap-2 items-center">
+              ${pics.length
+                ? pics.map(u=>`<a href="${u}" target="_blank"><img class="thumb" src="${u}"></a>`).join('')
+                : `<span class="text-slate-400">No photos</span>`
+              }
+              <label class="btn btn-border text-xs cursor-pointer">
+                Add photo
+                <input type="file" accept="image/*" class="hidden dash-add" data-id="${o.id}">
+              </label>
+            </div>
+          </td>
           <td class="p-2 font-medium">${o.orderId}</td>
           <td class="p-2">${o.customer||''}</td>
           <td class="p-2">${o.source||''}</td>
           <td class="p-2"><span class="chip ${chipClass}">${o.status}</span></td>
           <td class="p-2"><button class="btn btn-border" data-view="${o.id}">View</button></td>
           <td class="p-2">${[STATUS.SHIP,STATUS.CANCEL].includes(o.status)?'-':`<button class="btn btn-border text-rose-600" data-cancel="${o.id}">Cancel</button>`}</td>
-        </tr>`));
+        </tr>`);
+        dashTbody.appendChild(row);
+
+        // Handle inline Add photo
+        row.querySelectorAll('.dash-add[data-id="'+o.id+'"]').forEach(inp=>{
+          inp.onchange = async (e)=>{
+            const f = e.target.files?.[0];
+            if(!f) return;
+            try{
+              const path = `orders/${o.id}/intake_${Date.now()}_${f.name}`;
+              const r = sRef(storage, path);
+              await uploadBytes(r, f);
+              const url = await getDownloadURL(r);
+              await updateDoc(doc(db,'orders',o.id), {
+                intakePhotos: arrayUnion(url),
+                updatedAt: serverTimestamp()
+              });
+              toast('Photo added to order ✅');
+            }catch(err){
+              console.error(err);
+              toast('Failed to add photo', false);
+            }finally{
+              e.target.value = '';
+            }
+          };
+        });
 
         // STOCK
         if([STATUS.NEW,STATUS.PROD].includes(o.status)){
@@ -405,7 +444,7 @@
           orderMgrList.appendChild(c);
         }
 
-        // -------- QC (with full checklist) --------
+        // -------- QC (full checklist) --------
         if ([STATUS.PROD, STATUS.QCP].includes(o.status)) {
           const picsQ   = o.intakePhotos || [];
           const parcel  = (o.qc?.parcelPhotos || []);
@@ -509,7 +548,7 @@
             toast('Photo added ✅');
           };
 
-          // Save checklist + fields + tracking (without shipping)
+          // Save checklist + fields + tracking
           c.querySelector('.save').onclick = async ()=>{
             const checks = ['ghat','stone','oil','setting','scratch','polish','rhodium','earPush','lockOk'].reduce((acc,k)=>{
               acc[k] = c.querySelector(`[data-qc="${k}"]`)?.checked || false;
@@ -539,15 +578,13 @@
         }
 
         // View modal + Cancel
-        document.querySelectorAll(`[data-view="${o.id}"]`).forEach(btn=>{
-          btn.onclick=()=>{
-            $('#mTitle').textContent=`${o.orderId} — ${o.customer||''}`;
-            const box=$('#mPhotos'); box.innerHTML='';
-            (o.intakePhotos||[]).forEach(u=> box.appendChild(el(`<a href="${u}" target="_blank"><img class="thumb" src="${u}"></a>`)));
-            $('#orderModal').classList.add('open');
-          };
-        });
-        document.querySelectorAll(`[data-cancel="${o.id}"]`).forEach(btn=>{
+        row.querySelector(`[data-view="${o.id}"]`).onclick=()=>{
+          $('#mTitle').textContent=`${o.orderId} — ${o.customer||''}`;
+          const box=$('#mPhotos'); box.innerHTML='';
+          (o.intakePhotos||[]).forEach(u=> box.appendChild(el(`<a href="${u}" target="_blank"><img class="thumb" src="${u}"></a>`)));
+          $('#orderModal').classList.add('open');
+        };
+        row.querySelectorAll(`[data-cancel="${o.id}"]`).forEach(btn=>{
           btn.onclick=async ()=>{
             const reason=prompt('Cancel reason (optional):','Client canceled');
             if(reason===null) return;
