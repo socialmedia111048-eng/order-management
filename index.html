@@ -1,31 +1,60 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>KJ Orders – Intake / Production / QC</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>KJ Orders — Multi-Item Workflow</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    .thumb{width:56px;height:56px;object-fit:cover;border-radius:8px;border:1px solid #e5e7eb}
+    .thumb{width:56px;height:56px;object-fit:cover;border:1px solid #e5e7eb;border-radius:8px}
     .pill{border-radius:999px;padding:2px 8px;font-size:12px}
+    .card{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:16px}
   </style>
 </head>
 <body class="bg-gray-50 text-gray-900">
-  <div class="max-w-6xl mx-auto p-4">
-    <h1 class="text-xl font-semibold">KJ Orders</h1>
-    <p class="text-xs text-gray-500 mb-4">Intake → Production → QC/Dispatch (Firebase)</p>
+  <div class="max-w-7xl mx-auto p-4">
+    <header class="mb-3">
+      <h1 class="text-xl font-semibold">KJ Orders</h1>
+      <p class="text-xs text-gray-500">Intake → Stock → Order Manager → QC/Dispatch (Firebase)</p>
+    </header>
 
-    <!-- Tabs -->
-    <div class="flex gap-2 mb-3">
-      <button class="tab px-3 py-2 border rounded bg-black text-white" data-tab="intake">1) Intake</button>
-      <button class="tab px-3 py-2 border rounded bg-white" data-tab="production">2) Production</button>
-      <button class="tab px-3 py-2 border rounded bg-white" data-tab="qc">3) QC</button>
+    <!-- Top Nav -->
+    <nav class="flex gap-2 mb-3">
+      <button class="tab px-3 py-2 border rounded bg-black text-white" data-tab="dashboard">Dashboard</button>
+      <button class="tab px-3 py-2 border rounded bg-white" data-tab="intake">1) Intake</button>
+      <button class="tab px-3 py-2 border rounded bg-white" data-tab="stock">2) Stock Manager</button>
+      <button class="tab px-3 py-2 border rounded bg-white" data-tab="ordermgr">3) Order Manager</button>
+      <button class="tab px-3 py-2 border rounded bg-white" data-tab="qc">4) QC / Dispatch</button>
       <span class="ml-auto text-xs text-gray-500" id="whoami"></span>
-    </div>
+    </nav>
 
-    <!-- Intake -->
-    <section id="view-intake" class="border rounded-xl bg-white p-4">
-      <h2 class="font-medium mb-2">Add order</h2>
+    <!-- DASHBOARD -->
+    <section id="view-dashboard" class="card">
+      <h2 class="font-medium mb-2">Overview</h2>
+      <div class="grid sm:grid-cols-4 gap-3 mb-3">
+        <div class="p-3 rounded-xl bg-blue-50"><div class="text-xs text-gray-500">New</div><div id="mNew" class="text-2xl font-bold">0</div></div>
+        <div class="p-3 rounded-xl bg-amber-50"><div class="text-xs text-gray-500">In Production</div><div id="mProd" class="text-2xl font-bold">0</div></div>
+        <div class="p-3 rounded-xl bg-purple-50"><div class="text-xs text-gray-500">QC Pending</div><div id="mQCP" class="text-2xl font-bold">0</div></div>
+        <div class="p-3 rounded-xl bg-green-50"><div class="text-xs text-gray-500">Shipped</div><div id="mShip" class="text-2xl font-bold">0</div></div>
+      </div>
+      <div class="overflow-auto">
+        <table class="w-full text-sm" id="tblDash">
+          <thead class="bg-gray-100"><tr>
+            <th class="p-2 text-left">Photo</th>
+            <th class="p-2 text-left">Order</th>
+            <th class="p-2 text-left">Customer</th>
+            <th class="p-2 text-left">Source</th>
+            <th class="p-2 text-left">Items</th>
+            <th class="p-2 text-left">Status</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- INTAKE -->
+    <section id="view-intake" class="card hidden">
+      <h2 class="font-medium mb-3">1) Intake — Operations Manager</h2>
       <form id="formIntake" class="grid md:grid-cols-2 gap-3">
         <div>
           <label class="text-xs text-gray-600">Order ID</label>
@@ -45,73 +74,66 @@
           </select>
         </div>
         <div>
-          <label class="text-xs text-gray-600">Order photo (optional)</label>
-          <input id="photo" type="file" accept="image/*" class="w-full border rounded px-3 py-2">
-          <div id="photoPreview" class="mt-2"></div>
+          <label class="text-xs text-gray-600">Courier</label>
+          <select name="courier" class="w-full border rounded px-3 py-2">
+            <option>OnPoint</option>
+            <option>Sardar</option>
+            <option>Others</option>
+          </select>
         </div>
+        <div class="md:col-span-2">
+          <label class="text-xs text-gray-600">Remarks</label>
+          <input name="remarks" class="w-full border rounded px-3 py-2" placeholder="Customer notes…">
+        </div>
+
+        <!-- Order Photo -->
+        <div class="md:col-span-2">
+          <label class="text-xs text-gray-600">Order photo (Etsy screenshot)</label>
+          <input id="intakePhoto" type="file" accept="image/*" class="w-full border rounded px-3 py-2">
+          <div id="intakePreview" class="mt-2"></div>
+        </div>
+
+        <!-- ITEMS -->
+        <div class="md:col-span-2">
+          <div class="flex items-center justify-between mb-1">
+            <label class="text-xs text-gray-600">Items in this order</label>
+            <button type="button" id="addItem" class="text-xs border rounded px-2 py-1">+ Add item</button>
+          </div>
+          <div id="itemsWrap" class="grid gap-2"></div>
+        </div>
+
         <div class="md:col-span-2">
           <button class="px-3 py-2 bg-black text-white rounded" type="submit">Add Order</button>
         </div>
       </form>
-
-      <h3 class="mt-5 font-medium">Recent orders</h3>
-      <div class="overflow-auto mt-1">
-        <table class="w-full text-sm" id="tblIntake">
-          <thead class="bg-gray-100">
-            <tr>
-              <th class="p-2 text-left">Photo</th>
-              <th class="p-2 text-left">Order</th>
-              <th class="p-2 text-left">Customer</th>
-              <th class="p-2 text-left">Source</th>
-              <th class="p-2 text-left">Status</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-      </div>
     </section>
 
-    <!-- Production -->
-    <section id="view-production" class="border rounded-xl bg-white p-4 hidden">
-      <h2 class="font-medium mb-2">Mark stock / artisan</h2>
-      <div class="overflow-auto">
-        <table class="w-full text-sm" id="tblProd">
-          <thead class="bg-gray-100"><tr>
-            <th class="p-2 text-left">Order</th>
-            <th class="p-2">Stock?</th>
-            <th class="p-2">Give to artisan?</th>
-            <th class="p-2">Save</th>
-          </tr></thead>
-          <tbody></tbody>
-        </table>
-      </div>
+    <!-- STOCK MANAGER -->
+    <section id="view-stock" class="card hidden">
+      <h2 class="font-medium mb-2">2) Stock Manager — Ready vs To Make</h2>
+      <div id="stockList" class="grid gap-3"></div>
     </section>
 
-    <!-- QC -->
-    <section id="view-qc" class="border rounded-xl bg-white p-4 hidden">
-      <h2 class="font-medium mb-2">QC / Dispatch</h2>
-      <div class="overflow-auto">
-        <table class="w-full text-sm" id="tblQC">
-          <thead class="bg-gray-100"><tr>
-            <th class="p-2 text-left">Order</th>
-            <th class="p-2 text-left">Parcel Photos</th>
-            <th class="p-2 text-left">Tracking</th>
-            <th class="p-2">Actions</th>
-          </tr></thead>
-          <tbody></tbody>
-        </table>
-      </div>
+    <!-- ORDER MANAGER -->
+    <section id="view-ordermgr" class="card hidden">
+      <h2 class="font-medium mb-2">3) Order Manager — Send to QC</h2>
+      <div id="orderMgrList" class="grid gap-3"></div>
+    </section>
+
+    <!-- QC / DISPATCH -->
+    <section id="view-qc" class="card hidden">
+      <h2 class="font-medium mb-2">4) QC / Dispatch</h2>
+      <div id="qcList" class="grid gap-3"></div>
     </section>
   </div>
 
-  <!-- Firebase (modules) -->
+  <!-- Firebase -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
     import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
     import { getFirestore, collection, addDoc, doc, onSnapshot, orderBy, query, serverTimestamp, updateDoc } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
     import { getStorage, ref as sRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-storage.js";
 
-    // Your Firebase config
     const firebaseConfig = {
       apiKey: "AIzaSyCcFWt73v5_fq2nqvCTkxh98Zd48ZesllY",
       authDomain: "order-management-portal-edc78.firebaseapp.com",
@@ -128,13 +150,14 @@
 
     // Tabs
     const tabs = document.querySelectorAll('.tab');
-    const views = { intake: '#view-intake', production: '#view-production', qc: '#view-qc' };
-    function show(id){ Object.values(views).forEach(s=>document.querySelector(s).classList.add('hidden')); document.querySelector(views[id]).classList.remove('hidden'); tabs.forEach(b=>{ b.classList.toggle('bg-black', b.dataset.tab===id); b.classList.toggle('text-white', b.dataset.tab===id); });}
+    const views = { dashboard:'#view-dashboard', intake:'#view-intake', stock:'#view-stock', ordermgr:'#view-ordermgr', qc:'#view-qc' };
+    function show(id){ Object.values(views).forEach(v=>document.querySelector(v).classList.add('hidden')); document.querySelector(views[id]).classList.remove('hidden'); tabs.forEach(b=>{ b.classList.toggle('bg-black', b.dataset.tab===id); b.classList.toggle('text-white', b.dataset.tab===id);});}
     tabs.forEach(b=> b.onclick = ()=> show(b.dataset.tab));
+    show('dashboard');
 
     // Auth
     signInAnonymously(auth);
-    onAuthStateChanged(auth, u => { document.getElementById('whoami').textContent = u ? 'Signed in (anon)' : 'Not signed in'; });
+    onAuthStateChanged(auth, u=>{ document.getElementById('whoami').textContent = u? 'Signed in (anon)':'Not signed in'; });
 
     // Helpers
     const ORDERS = collection(db, 'orders');
@@ -142,99 +165,208 @@
     const $ = sel => document.querySelector(sel);
     const el = html => { const t=document.createElement('template'); t.innerHTML=html.trim(); return t.content.firstChild; };
 
-    // Preview selected order photo
-    const photo = $('#photo'), photoPreview = $('#photoPreview');
-    photo.onchange = () => {
-      photoPreview.innerHTML = '';
-      const f = photo.files?.[0];
-      if (f) photoPreview.innerHTML = `<img class="thumb" src="${URL.createObjectURL(f)}">`;
-    };
+    // ---------- Intake (multi items) ----------
+    const itemsWrap = $('#itemsWrap');
+    function addItemRow(v={name:'', qty:1, inStock:false, toArtisan:false, notes:'', sentToQCAt:null}){
+      const row = el(`<div class="grid md:grid-cols-12 gap-2 border rounded p-2">
+        <input class="border rounded px-2 py-1 md:col-span-6" placeholder="Item name / SKU" value="${v.name}">
+        <input type="number" min="1" class="border rounded px-2 py-1 md:col-span-2" value="${v.qty||1}">
+        <button type="button" class="border rounded px-2 py-1 text-red-600 md:col-span-2">Remove</button>
+      </div>`);
+      row.querySelector('button').onclick = ()=> row.remove();
+      itemsWrap.appendChild(row);
+    }
+    $('#addItem').onclick = ()=> addItemRow();
 
-    // Intake submit
-    const form = $('#formIntake');
-    form.onsubmit = async (e) => {
+    // one initial row
+    addItemRow();
+
+    const intakePhoto = $('#intakePhoto');
+    const intakePreview = $('#intakePreview');
+    intakePhoto.onchange = ()=>{ intakePreview.innerHTML=''; const f=intakePhoto.files?.[0]; if(f){ intakePreview.innerHTML=`<img class="thumb" src="${URL.createObjectURL(f)}">`; } };
+
+    $('#formIntake').onsubmit = async (e)=>{
       e.preventDefault();
-      const fd = new FormData(form);
+      // collect items
+      const items = [...itemsWrap.children].map(row=>{
+        const [nameEl, qtyEl] = row.querySelectorAll('input');
+        return { name:nameEl.value.trim(), qty:parseInt(qtyEl.value||1,10), inStock:false, toArtisan:false, notes:'', sentToQCAt:null };
+      }).filter(i=>i.name);
+      if(!items.length){ alert('Add at least one item'); return; }
+
+      const fd = new FormData(e.target);
       const data = {
-        orderId: fd.get('orderId'),
-        customer: fd.get('customer'),
-        source: fd.get('source'),
-        status: STATUS.NEW,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        intakePhotos: [],
-        prod:{ inStock:false, giveToArtisan:false },
-        qc:{ tracking:'', parcelPhotos:[] }
+        orderId: fd.get('orderId'), customer: fd.get('customer'), source: fd.get('source'),
+        courier: fd.get('courier'), remarks: fd.get('remarks')||'',
+        status: STATUS.NEW, createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+        intakePhotos: [], items, qc:{ tracking:'', parcelPhotos:[] }
       };
       const ref = await addDoc(ORDERS, data);
 
-      const f = photo.files?.[0];
+      const f = intakePhoto.files?.[0];
       if (f) {
         const path = `orders/${ref.id}/intake_${Date.now()}_${f.name}`;
         await uploadBytes(sRef(storage, path), f);
         const url = await getDownloadURL(sRef(storage, path));
         await updateDoc(doc(db,'orders',ref.id), { intakePhotos:[url], updatedAt: serverTimestamp() });
       }
-      form.reset(); photoPreview.innerHTML='';
-      alert('Order added');
+      e.target.reset(); itemsWrap.innerHTML=''; addItemRow(); intakePreview.innerHTML='';
+      alert('Order added'); show('dashboard');
     };
 
-    // Live tables
+    // ---------- Live data feed ----------
     const q = query(ORDERS, orderBy('createdAt','desc'));
-    onSnapshot(q, snap => {
-      // Intake
-      const tbI = $('#tblIntake tbody'); tbI.innerHTML='';
-      // Production
-      const tbP = $('#tblProd tbody'); tbP.innerHTML='';
-      // QC
-      const tbQ = $('#tblQC tbody'); tbQ.innerHTML='';
+    onSnapshot(q, snap=>{
+      // Dashboard
+      const dashTbody = document.querySelector('#tblDash tbody'); dashTbody.innerHTML='';
+      let cNew=0,cProd=0,cQCP=0,cShip=0;
 
-      snap.forEach(d => {
-        const o = { id: d.id, ...d.data() };
+      // views
+      const stockList = $('#stockList'); stockList.innerHTML='';
+      const orderMgrList = $('#orderMgrList'); orderMgrList.innerHTML='';
+      const qcList = $('#qcList'); qcList.innerHTML='';
+
+      snap.forEach(d=>{
+        const o = {id:d.id, ...d.data()};
+        if(o.status===STATUS.NEW)cNew++; else if(o.status===STATUS.PROD)cProd++; else if(o.status===STATUS.QCP)cQCP++; else if(o.status===STATUS.SHIP)cShip++;
         const firstPic = (o.intakePhotos && o.intakePhotos[0]) ? o.intakePhotos[0] : '';
 
-        // Intake row with thumbnail
-        tbI.appendChild(el(`<tr>
-          <td class="p-2">${firstPic ? `<a href="${firstPic}" target="_blank"><img class="thumb" src="${firstPic}"></a>` : '-'}</td>
-          <td class="p-2">${o.orderId||''}</td>
+        const readyCount = (o.items||[]).filter(i=>i.inStock || i.sentToQCAt).length;
+        const totalCount = (o.items||[]).reduce((a,i)=>a+(i.qty||1),0);
+
+        dashTbody.appendChild(el(`<tr>
+          <td class="p-2">${firstPic?`<a href="${firstPic}" target="_blank"><img class="thumb" src="${firstPic}"></a>`:'-'}</td>
+          <td class="p-2 font-medium">${o.orderId}</td>
           <td class="p-2">${o.customer||''}</td>
           <td class="p-2">${o.source||''}</td>
-          <td class="p-2"><span class="pill bg-blue-50 text-blue-700">${o.status}</span></td>
+          <td class="p-2">${readyCount}/${totalCount}</td>
+          <td class="p-2"><span class="pill ${o.status===STATUS.NEW?'bg-blue-50 text-blue-700':o.status===STATUS.PROD?'bg-amber-50 text-amber-700':o.status===STATUS.QCP?'bg-purple-50 text-purple-700':'bg-green-50 text-green-700'}">${o.status}</span></td>
         </tr>`));
 
-        // Production rows
-        if (o.status===STATUS.NEW || o.status===STATUS.PROD){
-          const r = el(`<tr>
-            <td class="p-2">${o.orderId}</td>
-            <td class="p-2"><input type="checkbox" ${o.prod?.inStock?'checked':''} data-k="inStock"></td>
-            <td class="p-2"><input type="checkbox" ${o.prod?.giveToArtisan?'checked':''} data-k="giveToArtisan"></td>
-            <td class="p-2"><button class="border rounded px-2 py-1">Save</button></td>
-          </tr>`);
-          r.querySelector('button').onclick = async ()=>{
-            const inStock = r.querySelector('[data-k="inStock"]').checked;
-            const giveToArtisan = r.querySelector('[data-k="giveToArtisan"]').checked;
-            const next = giveToArtisan ? STATUS.PROD : (inStock ? STATUS.QCP : STATUS.NEW);
-            await updateDoc(doc(db,'orders',o.id), { prod:{inStock,giveToArtisan}, status: next, updatedAt: serverTimestamp() });
-            alert('Saved');
-          };
-          tbP.appendChild(r);
+        // STOCK MANAGER card (per-item inStock / toArtisan)
+        if([STATUS.NEW, STATUS.PROD].includes(o.status)){
+          const card = el(`<div class="border rounded-xl p-3">
+            <div class="flex items-center justify-between">
+              <div class="font-medium">${o.orderId} — <span class="text-xs text-gray-500">${o.customer}</span></div>
+              <div class="text-xs text-gray-500">${o.source} • ${o.courier||''}</div>
+            </div>
+            <div class="mt-2 overflow-auto">
+              <table class="w-full text-sm">
+                <thead class="bg-gray-100"><tr>
+                  <th class="p-2 text-left">Item</th>
+                  <th class="p-2">Qty</th>
+                  <th class="p-2">In Stock</th>
+                  <th class="p-2">Give to Artisan</th>
+                  <th class="p-2 text-left">Notes</th>
+                  <th class="p-2">Save</th>
+                </tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>`);
+          const tb = card.querySelector('tbody');
+          (o.items||[]).forEach((it,idx)=>{
+            const r = el(`<tr>
+              <td class="p-2">${it.name}</td>
+              <td class="p-2 text-center">${it.qty||1}</td>
+              <td class="p-2 text-center"><input type="checkbox" ${it.inStock?'checked':''} data-k="inStock"></td>
+              <td class="p-2 text-center"><input type="checkbox" ${it.toArtisan?'checked':''} data-k="toArtisan"></td>
+              <td class="p-2"><input class="border rounded px-2 py-1 w-64" value="${it.notes||''}" data-k="notes"></td>
+              <td class="p-2"><button class="border rounded px-2 py-1">Save</button></td>
+            </tr>`);
+            r.querySelector('button').onclick = async ()=>{
+              const inStock = r.querySelector('[data-k="inStock"]').checked;
+              const toArtisan = r.querySelector('[data-k="toArtisan"]').checked;
+              const notes = r.querySelector('[data-k="notes"]').value;
+              const newItems = [...o.items]; newItems[idx] = {...it, inStock, toArtisan, notes};
+              const nextStatus = newItems.some(x=>x.toArtisan && !x.sentToQCAt) ? STATUS.PROD :
+                                newItems.every(x=>x.inStock || x.sentToQCAt) ? STATUS.QCP : STATUS.NEW;
+              await updateDoc(doc(db,'orders',o.id), { items:newItems, status: nextStatus, updatedAt: serverTimestamp() });
+              alert('Saved');
+            };
+            tb.appendChild(r);
+          });
+          stockList.appendChild(card);
         }
 
-        // QC rows with parcel photos gallery
-        if (o.status===STATUS.PROD || o.status===STATUS.QCP){
+        // ORDER MANAGER card (mark Sent to QC per item)
+        if([STATUS.PROD, STATUS.NEW].includes(o.status)){
+          const pending = (o.items||[]).some(i=>!i.inStock && !i.sentToQCAt);
+          if(pending){
+            const card = el(`<div class="border rounded-xl p-3">
+              <div class="font-medium">${o.orderId} — <span class="text-xs text-gray-500">${o.customer}</span></div>
+              <div class="mt-2 overflow-auto">
+                <table class="w-full text-sm">
+                  <thead class="bg-gray-100"><tr>
+                    <th class="p-2 text-left">Item</th>
+                    <th class="p-2">Qty</th>
+                    <th class="p-2 text-left">Notes</th>
+                    <th class="p-2">Sent to QC?</th>
+                  </tr></thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+            </div>`);
+            const tb = card.querySelector('tbody');
+            (o.items||[]).forEach((it,idx)=>{
+              if(it.inStock) return;
+              const r = el(`<tr>
+                <td class="p-2">${it.name}</td>
+                <td class="p-2 text-center">${it.qty||1}</td>
+                <td class="p-2"><input class="border rounded px-2 py-1 w-64" value="${it.notes||''}" data-k="notes"></td>
+                <td class="p-2"><button class="border rounded px-2 py-1">Mark Sent (add date)</button></td>
+              </tr>`);
+              r.querySelector('button').onclick = async ()=>{
+                const notes = r.querySelector('[data-k="notes"]').value;
+                const newItems = [...o.items]; newItems[idx] = {...it, notes, sentToQCAt: new Date().toISOString()};
+                const nextStatus = newItems.every(x=>x.inStock || x.sentToQCAt) ? STATUS.QCP : STATUS.PROD;
+                await updateDoc(doc(db,'orders',o.id), { items:newItems, status: nextStatus, updatedAt: serverTimestamp() });
+                alert('Marked sent to QC');
+              };
+              tb.appendChild(r);
+            });
+            orderMgrList.appendChild(card);
+          }
+        }
+
+        // QC card
+        if([STATUS.PROD, STATUS.QCP].includes(o.status)){
           const thumbs = (o.qc?.parcelPhotos||[]).map(u=>`<a href="${u}" target="_blank"><img class="thumb" src="${u}"></a>`).join('');
-          const r = el(`<tr>
-            <td class="p-2">${o.orderId}</td>
-            <td class="p-2"><div class="flex gap-2 items-center">${thumbs||'-'} <input type="file" class="file border rounded px-2 py-1 ml-2" accept="image/*"></div></td>
-            <td class="p-2"><input value="${o.qc?.tracking||''}" class="track border rounded px-2 py-1"></td>
-            <td class="p-2">
-              <button class="save border rounded px-2 py-1 mr-1">Save</button>
-              <button class="ship bg-black text-white rounded px-2 py-1">Approve & Ship</button>
-            </td>
-          </tr>`);
+          const card = el(`<div class="border rounded-xl p-3">
+            <div class="font-medium mb-1">${o.orderId} — <span class="text-xs text-gray-500">${o.customer}</span></div>
+            <div class="grid sm:grid-cols-2 gap-2 text-sm">
+              <div>
+                <!-- Hindi QC checklist -->
+                <div class="grid grid-cols-1 gap-1">
+                  ${['घाट ठीक है','स्टोन सही है','ऑईल लगा दिया','सेटिंग ठीक है','कोई स्क्रैच नहीं है','पॉलिश ठीक है','रॉडियम ठीक है','ईयरिंग का पुश सही काम कर रहा है','लॉक सही से बंद हो रहा है'].map((label,i)=>`<label class="flex items-center gap-2"><input type="checkbox" data-k="qc${i}"> ${label}</label>`).join('')}
+                </div>
+              </div>
+              <div class="grid gap-2">
+                <div class="flex items-center gap-2">
+                  <span>Ring size</span><input class="border rounded px-2 py-1 w-24" data-k="ring">
+                  <span>सामान की गिनती</span><input class="border rounded px-2 py-1 w-24" data-k="qty">
+                </div>
+                <div>
+                  <div class="text-xs text-gray-600 mb-1">Marking</div>
+                  <div class="flex gap-3 text-xs">
+                    ${['No','14K','18K','10K','9K','925'].map(m=>`<label class="flex items-center gap-1"><input type="radio" name="m_${o.id}" value="${m}" data-k="mark"> ${m}</label>`).join('')}
+                  </div>
+                </div>
+                <div>
+                  <div class="text-xs text-gray-600">Parcel photos</div>
+                  <div class="flex gap-2 items-center">${thumbs||'-'} <input type="file" class="file border rounded px-2 py-1 ml-2" accept="image/*"></div>
+                </div>
+                <div class="flex gap-2">
+                  <input class="track border rounded px-2 py-1 flex-1" placeholder="Tracking no." value="${o.qc?.tracking||''}">
+                  <button class="save border rounded px-2 py-1">Save</button>
+                  <button class="ship bg-black text-white rounded px-2 py-1">Approve & Ship</button>
+                </div>
+              </div>
+            </div>
+          </div>`);
 
           // upload parcel photo
-          r.querySelector('.file').onchange = async (e)=>{
+          card.querySelector('.file').onchange = async (e)=>{
             const f = e.target.files?.[0]; if(!f) return;
             const path = `orders/${o.id}/parcel_${Date.now()}_${f.name}`;
             await uploadBytes(sRef(storage, path), f);
@@ -243,24 +375,29 @@
             await updateDoc(doc(db,'orders',o.id), { 'qc.parcelPhotos': photos, status: STATUS.QCP, updatedAt: serverTimestamp() });
             alert('Photo added');
           };
+
           // save qc
-          r.querySelector('.save').onclick = async ()=>{
-            const tracking = r.querySelector('.track').value;
+          card.querySelector('.save').onclick = async ()=>{
+            const tracking = card.querySelector('.track').value;
+            // we just store a simple QC snapshot; checks/ring/qty/mark are informational
             await updateDoc(doc(db,'orders',o.id), { qc:{ ...(o.qc||{}), tracking }, status: STATUS.QCP, updatedAt: serverTimestamp() });
             alert('QC saved');
           };
+
           // ship
-          r.querySelector('.ship').onclick = async ()=>{
+          card.querySelector('.ship').onclick = async ()=>{
             await updateDoc(doc(db,'orders',o.id), { status: STATUS.SHIP, updatedAt: serverTimestamp() });
-            alert('Shipped');
+            alert('Marked shipped');
           };
 
-          tbQ.appendChild(r);
+          qcList.appendChild(card);
         }
       });
-    });
 
-    show('intake');
+      // metrics
+      $('#mNew').textContent=cNew; $('#mProd').textContent=cProd; $('#mQCP').textContent=cQCP; $('#mShip').textContent=cShip;
+    });
   </script>
 </body>
 </html>
+
