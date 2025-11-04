@@ -3,12 +3,12 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>KJ Orders — Simple Photos Workflow</title>
+  <title>KJ Orders — Photos + QC Workflow</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    .thumb{width:64px;height:64px;object-fit:cover;border:1px solid #e5e7eb;border-radius:10px}
+    .thumb{width:64px;height:64px;object-fit:cover;border:1px solid #e5e7eb;border-radius:12px}
     .chip{border-radius:999px;padding:2px 10px;font-size:12px}
-    .card{background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:14px;box-shadow:0 6px 20px rgba(0,0,0,.05)}
+    .card{background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:14px;box-shadow:0 6px 18px rgba(0,0,0,.05)}
     .sticky-tabs{position:sticky;top:0;z-index:30;background:linear-gradient(#f8fafc,#f8fafc)}
     .btn{border-radius:12px;padding:.58rem .9rem}
     .btn-main{background:#1f6feb;color:#fff}
@@ -19,13 +19,14 @@
     @keyframes fade-in{from{opacity:.3;transform:translate(-50%,8px)}to{opacity:1;transform:translate(-50%,0)}}
     .modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;padding:16px;z-index:40}
     .modal.open{display:flex}
+    a { word-break: break-all; }
   </style>
 </head>
 <body class="bg-slate-50 text-slate-900">
   <div class="max-w-7xl mx-auto p-4">
     <header class="mb-2">
       <h1 class="text-2xl font-semibold">KJ Orders</h1>
-      <p class="text-xs text-slate-500">Fast intake with photos → Stock notes → QC & Dispatch</p>
+      <p class="text-xs text-slate-500">Fast intake with photos → Stock notes → Order Manager → QC & Dispatch</p>
     </header>
 
     <!-- Tabs -->
@@ -39,6 +40,22 @@
         <span class="ml-auto text-xs self-center" id="whoami"></span>
       </div>
     </nav>
+
+    <!-- Diagnostics (bucket check + storage test) -->
+    <section id="diag" class="card mb-3">
+      <div class="flex items-center justify-between gap-3">
+        <div>
+          <div class="font-medium">Photo Diagnostics</div>
+          <div class="text-xs text-slate-500">Verifies Firebase Storage bucket and uploads a tiny test file.</div>
+        </div>
+        <div class="flex gap-2">
+          <button id="btnCheckBucket" class="btn btn-border">Check bucket</button>
+          <button id="btnTestUpload" class="btn btn-main">Test upload</button>
+        </div>
+      </div>
+      <div id="diagMsg" class="text-sm mt-2"></div>
+      <div id="diagThumb" class="mt-2"></div>
+    </section>
 
     <!-- DASHBOARD -->
     <section id="view-dashboard" class="card">
@@ -141,19 +158,19 @@
   <!-- Toast -->
   <div id="toast"></div>
 
-  <!-- Firebase -->
+  <!-- Firebase + App -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
     import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
     import { getFirestore, collection, addDoc, doc, onSnapshot, orderBy, query, serverTimestamp, updateDoc, where, getDocs } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
     import { getStorage, ref as sRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-storage.js";
 
-    // 🔧 FIXED BUCKET (.appspot.com)
+    // ✅ YOUR PROJECT (fixed bucket .appspot.com)
     const firebaseConfig = {
       apiKey: "AIzaSyCcFWt73v5_fq2nqvCTkxh98Zd48ZesllY",
       authDomain: "order-management-portal-edc78.firebaseapp.com",
       projectId: "order-management-portal-edc78",
-      storageBucket: "order-management-portal-edc78.appspot.com",   // ✅ correct
+      storageBucket: "order-management-portal-edc78.appspot.com",   // ← correct
       messagingSenderId: "1064944592307",
       appId: "1:1064944592307:web:d985383a3d47e097b357c6"
     };
@@ -166,7 +183,16 @@
     // Tabs
     const tabs = document.querySelectorAll('.tab');
     const views = { dashboard:'#view-dashboard', intake:'#view-intake', stock:'#view-stock', ordermgr:'#view-ordermgr', qc:'#view-qc' };
-    function show(id){ Object.values(views).forEach(v=>document.querySelector(v).classList.add('hidden')); document.querySelector(views[id]).classList.remove('hidden'); tabs.forEach(b=>{ const a=b.dataset.tab===id; b.classList.toggle('bg-black',a); b.classList.toggle('text-white',a); b.classList.toggle('btn-sub',!a);});}
+    function show(id){
+      Object.values(views).forEach(v=>document.querySelector(v).classList.add('hidden'));
+      document.querySelector(views[id]).classList.remove('hidden');
+      tabs.forEach(b=>{
+        const a=b.dataset.tab===id;
+        b.classList.toggle('bg-black',a);
+        b.classList.toggle('text-white',a);
+        b.classList.toggle('btn-sub',!a);
+      });
+    }
     tabs.forEach(b=> b.onclick = ()=> show(b.dataset.tab));
     show('dashboard');
 
@@ -181,20 +207,68 @@
     const el = h=>{ const t=document.createElement('template'); t.innerHTML=h.trim(); return t.content.firstChild; };
     const toast = (msg,ok=true)=>{ const n=el(`<div class="fade-in bg-white border rounded-xl px-3 py-2 shadow text-sm ${ok?'border-emerald-300':'border-rose-300'}">${msg}</div>`); const t=$('#toast'); t.appendChild(n); setTimeout(()=>n.remove(),2200); };
 
+    // ---------- Diagnostics ----------
+    const diagMsg = s => { const el = document.getElementById('diagMsg'); el.innerHTML = s; };
+    const diagThumb = (url) => {
+      const box = document.getElementById('diagThumb');
+      box.innerHTML = url
+        ? `<div class="text-xs text-slate-500">Test file uploaded:</div>
+           <div class="flex items-center gap-2 mt-1">
+             <img src="${url}" class="thumb">
+             <a href="${url}" target="_blank" class="text-blue-600 underline">${url}</a>
+           </div>`
+        : '';
+    };
+    function checkBucket(){
+      const bucket = app.options?.storageBucket || '(missing)';
+      const ok = bucket.endsWith('.appspot.com');
+      const msg = ok ? `✅ Bucket OK: <b>${bucket}</b>`
+                     : `❌ WRONG bucket: <b>${bucket}</b><br>It must end with <b>.appspot.com</b>. Fix <code>storageBucket</code> in code.`;
+      diagMsg(msg);
+      const addBtn = document.getElementById('btnAddOrder'); if(addBtn) addBtn.disabled = !ok;
+      return ok;
+    }
+    async function testUpload(){
+      diagThumb('');
+      if(!checkBucket()){ toast('Fix storageBucket first', false); return; }
+      try{
+        const blob = new Blob(['KJ Orders test @ '+new Date().toISOString()], {type:'text/plain'});
+        const path = `diagnostics/test_${Date.now()}.txt`;
+        const r = sRef(storage, path);
+        await uploadBytes(r, blob);
+        const url = await getDownloadURL(r);
+        diagMsg('✅ Upload success. You should see a tiny text file in Storage → /diagnostics');
+        diagThumb(url);
+        toast('Storage test OK ✅');
+      }catch(err){
+        console.error('Test upload failed:', err);
+        diagMsg(`❌ Upload failed:<br><code>${err?.message||err}</code>`);
+        toast('Test upload failed', false);
+      }
+    }
+    document.getElementById('btnCheckBucket').addEventListener('click', checkBucket);
+    document.getElementById('btnTestUpload').addEventListener('click', testUpload);
+    checkBucket();
+
     // Intake preview
     const intakePhoto = $('#intakePhoto'), intakePreview=$('#intakePreview');
     intakePhoto.onchange = ()=>{ intakePreview.innerHTML=''; [...(intakePhoto.files||[])].forEach(f=> intakePreview.appendChild(el(`<img class="thumb" src="${URL.createObjectURL(f)}">`))); };
 
-    // ADD ORDER (simple + safe + photos)
+    // ADD ORDER (with photos)
     const form=$('#formIntake'); const btnAdd=$('#btnAddOrder');
     form.onsubmit = async (e)=>{
-      e.preventDefault(); if(btnAdd.disabled) return;
+      e.preventDefault();
+      if(btnAdd.disabled) return;
+
       const fd=new FormData(form); const orderId=(fd.get('orderId')||'').trim();
       if(!orderId){ toast('Order ID required',false); return; }
+
+      const selectedFiles = [...(intakePhoto.files||[])];
+      if(selectedFiles.length===0){ toast('Please select at least one order photo', false); return; }
+
       btnAdd.disabled=true; toast('Saving…');
 
       try{
-        // stop duplicates
         const exists=await getDocs(query(ORDERS, where('orderId','==',orderId)));
         if(!exists.empty){ toast('Order ID already exists ❌',false); btnAdd.disabled=false; return; }
 
@@ -208,24 +282,24 @@
           createdAt:serverTimestamp(),
           updatedAt:serverTimestamp(),
           intakePhotos:[],
-          // simple progress flags + notes
           progress:{ inStock:false, toArtisan:false, sentToQC:false, sentToQCAt:null },
           stockNotes:'',
           orderMgrNotes:'',
-          qc:{ tracking:'', parcelPhotos:[] }
+          qc:{ checklist:{}, ringSize:'', qty:null, hallmark:'no', tracking:'', parcelPhotos:[] }
         };
         const ref=await addDoc(ORDERS,data);
 
-        // upload photos (with error toasts)
-        const files=[...(intakePhoto.files||[])]; const urls=[];
-        for(const f of files){
+        // upload photos
+        const urls=[];
+        for(const f of selectedFiles){
           try{
             const path=`orders/${ref.id}/intake_${Date.now()}_${f.name}`;
             const r=sRef(storage,path); await uploadBytes(r,f);
             const url=await getDownloadURL(r); urls.push(url);
-          }catch(err){ console.error(err); toast('Upload failed',false); }
+          }catch(err){ console.error(err); toast('Upload failed: ' + (err?.message||''), false); }
         }
         if(urls.length){ await updateDoc(doc(db,'orders',ref.id), { intakePhotos:urls, updatedAt:serverTimestamp() }); }
+        else { toast('No photos uploaded (check rules/config)', false); }
 
         form.reset(); intakePreview.innerHTML='';
         toast('Order saved ✅'); show('dashboard');
@@ -238,7 +312,6 @@
     const q=query(ORDERS, orderBy('createdAt','desc'));
     onSnapshot(q, snap=>{
       metrics.new=metrics.prod=metrics.qcp=metrics.ship=metrics.cancel=0;
-
       const dashTbody=$('#tblDash tbody'); dashTbody.innerHTML='';
       const stockList=$('#stockList'); stockList.innerHTML='';
       const orderMgrList=$('#orderMgrList'); orderMgrList.innerHTML='';
@@ -259,7 +332,7 @@
                     : o.status===STATUS.SHIP ? 'bg-emerald-100 text-emerald-800'
                     : 'bg-rose-100 text-rose-800';
 
-        // Dashboard row (hide cancel button if shipped/canceled)
+        // Dashboard
         dashTbody.appendChild(el(`<tr>
           <td class="p-2"><div class="flex gap-2">${pics.length?pics.map(u=>`<a href="${u}" target="_blank"><img class="thumb" src="${u}"></a>`).join(''):'-'}</div></td>
           <td class="p-2 font-medium">${o.orderId}</td>
@@ -270,7 +343,7 @@
           <td class="p-2">${[STATUS.SHIP,STATUS.CANCEL].includes(o.status)?'-':`<button class="btn btn-border text-rose-600" data-cancel="${o.id}">Cancel</button>`}</td>
         </tr>`));
 
-        // STOCK (notes + toggles)
+        // STOCK
         if([STATUS.NEW,STATUS.PROD].includes(o.status)){
           const c=el(`<div class="border rounded-2xl p-3">
             <div class="flex items-center justify-between mb-1">
@@ -305,7 +378,7 @@
           stockList.appendChild(c);
         }
 
-        // ORDER MANAGER (notes + mark sent to QC)
+        // ORDER MANAGER
         if([STATUS.PROD,STATUS.NEW].includes(o.status)){
           const c=el(`<div class="border rounded-2xl p-3">
             <div class="font-medium mb-1">${o.orderId} <span class="text-xs text-slate-500">• ${o.customer}</span></div>
@@ -332,51 +405,140 @@
           orderMgrList.appendChild(c);
         }
 
-        // QC (order photos + parcel photos + tracking + ship)
-        if([STATUS.PROD,STATUS.QCP].includes(o.status)){
-          const parcel=(o.qc?.parcelPhotos||[]);
-          const c=el(`<div class="border rounded-2xl p-3">
-            <div class="font-medium mb-1">${o.orderId} <span class="text-xs text-slate-500">• ${o.customer}</span></div>
-            <div class="mb-2">
+        // -------- QC (with full checklist) --------
+        if ([STATUS.PROD, STATUS.QCP].includes(o.status)) {
+          const picsQ   = o.intakePhotos || [];
+          const parcel  = (o.qc?.parcelPhotos || []);
+          const c = el(`<div class="border rounded-2xl p-3">
+            <div class="font-medium mb-2">${o.orderId} <span class="text-xs text-slate-500">• ${o.customer||''}</span></div>
+
+            <div class="mb-3">
               <div class="text-xs text-slate-500 mb-1">Order Photos</div>
-              <div class="flex gap-2">${pics.map(u=>`<a href="${u}" target="_blank"><img class="thumb" src="${u}"></a>`).join('')||'-'}</div>
+              <div class="flex gap-2">${picsQ.map(u=>`<a href="${u}" target="_blank"><img class="thumb" src="${u}"></a>`).join('') || '-'}</div>
             </div>
-            <div class="grid sm:grid-cols-2 gap-2">
+
+            <div class="grid md:grid-cols-2 gap-4">
+              <!-- LEFT: Hindi checklist -->
+              <div class="grid grid-cols-1 gap-2 text-sm">
+                ${[
+                  ['ghat','घाट ठीक है'],
+                  ['stone','स्टोन सही है'],
+                  ['oil','ऑईल लगा दिया'],
+                  ['setting','सेटिंग ठीक है'],
+                  ['scratch','कोई स्क्रैच नहीं है'],
+                  ['polish','पॉलिश ठीक है'],
+                  ['rhodium','रोडियम ठीक है'],
+                ].map(([k,label])=>`
+                  <label class="flex items-center gap-2">
+                    <input type="checkbox" ${o.qc?.checklist?.[k] ? 'checked' : ''} data-qc="${k}">
+                    ${label}
+                  </label>
+                `).join('')}
+              </div>
+
+              <!-- RIGHT: extra checks + inputs -->
+              <div class="grid gap-2 text-sm">
+                <label class="flex items-center gap-2">
+                  <input type="checkbox" ${o.qc?.checklist?.earPush ? 'checked' : ''} data-qc="earPush">
+                  इयररिंग का पुश सही काम कर रहा है
+                </label>
+
+                <label class="flex items-center gap-2">
+                  <input type="checkbox" ${o.qc?.checklist?.lockOk ? 'checked' : ''} data-qc="lockOk">
+                  लॉक सही से बंद हो रहा है
+                </label>
+
+                <div class="grid grid-cols-2 gap-2">
+                  <div>
+                    <div class="text-xs text-slate-500 mb-1">रिंग साइज</div>
+                    <input class="border rounded-xl px-2 py-1 w-full" placeholder="e.g., 7" value="${o.qc?.ringSize || ''}" data-qc-text="ringSize">
+                  </div>
+                  <div>
+                    <div class="text-xs text-slate-500 mb-1">सामान की गिनती</div>
+                    <input type="number" min="0" class="border rounded-xl px-2 py-1 w-full" placeholder="Qty" value="${o.qc?.qty ?? ''}" data-qc-num="qty">
+                  </div>
+                </div>
+
+                <div>
+                  <div class="text-xs text-slate-500 mb-1">मार्किंग</div>
+                  <div class="flex flex-wrap gap-3 items-center">
+                    ${['no','14k','18k','10k','9k','925'].map(tag=>{
+                      const selected = (o.qc?.hallmark || 'no') === tag ? 'bg-black text-white' : 'bg-slate-100';
+                      const label = tag==='no' ? 'No' : tag.toUpperCase();
+                      return `<button type="button" class="btn ${selected} rounded-full px-3 py-1" data-hall="${tag}">${label}</button>`;
+                    }).join('')}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-3 mt-4">
               <div>
                 <div class="text-xs text-slate-500 mb-1">Parcel Photos</div>
-                <div class="flex gap-2 items-center">${parcel.map(u=>`<a href="${u}" target="_blank"><img class="thumb" src="${u}"></a>`).join('')}
+                <div class="flex gap-2 items-center">
+                  ${parcel.map(u=>`<a href="${u}" target="_blank"><img class="thumb" src="${u}"></a>`).join('')}
                   <input type="file" class="file border rounded-xl px-2 py-1" accept="image/*">
                 </div>
               </div>
-              <div class="flex gap-2">
-                <input class="track border rounded-xl px-2 py-1 flex-1" placeholder="Tracking no." value="${o.qc?.tracking||''}">
+              <div class="flex gap-2 items-center">
+                <input class="track border rounded-xl px-2 py-1 flex-1" placeholder="Tracking no." value="${o.qc?.tracking || ''}">
                 <button class="save btn btn-border">Save</button>
                 <button class="ship btn btn-main">Approve & Ship</button>
               </div>
             </div>
           </div>`);
+
+          // Marking picker
+          c.querySelectorAll('[data-hall]').forEach(btn=>{
+            btn.onclick = ()=>{
+              c.querySelectorAll('[data-hall]').forEach(b=> b.classList.remove('bg-black','text-white'));
+              btn.classList.add('bg-black','text-white');
+              c.dataset.hallmark = btn.getAttribute('data-hall');
+            };
+          });
+          c.dataset.hallmark = o.qc?.hallmark || 'no';
+
+          // Upload parcel photo
           c.querySelector('.file').onchange = async (e)=>{
             const f=e.target.files?.[0]; if(!f) return;
             const path=`orders/${o.id}/parcel_${Date.now()}_${f.name}`;
-            const r=sRef(storage,path); await uploadBytes(r,f);
+            const r=sRef(storage, path); await uploadBytes(r,f);
             const url=await getDownloadURL(r);
             const photos=(o.qc?.parcelPhotos||[]).concat(url);
             await updateDoc(doc(db,'orders',o.id), { 'qc.parcelPhotos':photos, status:STATUS.QCP, updatedAt:serverTimestamp() });
             toast('Photo added ✅');
           };
+
+          // Save checklist + fields + tracking (without shipping)
           c.querySelector('.save').onclick = async ()=>{
-            const tracking=c.querySelector('.track').value;
-            await updateDoc(doc(db,'orders',o.id), { qc:{...(o.qc||{}), tracking}, updatedAt:serverTimestamp() });
+            const checks = ['ghat','stone','oil','setting','scratch','polish','rhodium','earPush','lockOk'].reduce((acc,k)=>{
+              acc[k] = c.querySelector(`[data-qc="${k}"]`)?.checked || false;
+              return acc;
+            },{});
+            const ringSize = c.querySelector('[data-qc-text="ringSize"]').value.trim();
+            const qtyRaw   = c.querySelector('[data-qc-num="qty"]').value;
+            const qty = qtyRaw === '' ? null : Number(qtyRaw);
+            const tracking = c.querySelector('.track').value.trim();
+            const hallmark = c.dataset.hallmark || 'no';
+
+            await updateDoc(doc(db,'orders',o.id), { 
+              qc:{ ...(o.qc||{}), checklist:checks, ringSize, qty, hallmark, tracking },
+              status: STATUS.QCP,
+              updatedAt: serverTimestamp()
+            });
             toast('QC saved ✅');
           };
+
+          // Approve & Ship
           c.querySelector('.ship').onclick = async ()=>{
-            await updateDoc(doc(db,'orders',o.id), { status:STATUS.SHIP, updatedAt:serverTimestamp() });
+            await updateDoc(doc(db,'orders',o.id), { status: STATUS.SHIP, updatedAt: serverTimestamp() });
             toast('Marked shipped ✅');
           };
+
           qcList.appendChild(c);
         }
 
-        // View modal + Cancel handlers
+        // View modal + Cancel
         document.querySelectorAll(`[data-view="${o.id}"]`).forEach(btn=>{
           btn.onclick=()=>{
             $('#mTitle').textContent=`${o.orderId} — ${o.customer||''}`;
@@ -385,11 +547,10 @@
             $('#orderModal').classList.add('open');
           };
         });
-
         document.querySelectorAll(`[data-cancel="${o.id}"]`).forEach(btn=>{
           btn.onclick=async ()=>{
             const reason=prompt('Cancel reason (optional):','Client canceled');
-            if(reason===null) return; // user pressed Cancel
+            if(reason===null) return;
             await updateDoc(doc(db,'orders',o.id), { status:STATUS.CANCEL, canceledAt:serverTimestamp(), canceledReason:reason||'' });
             toast('Order canceled');
           };
@@ -397,10 +558,11 @@
       });
 
       // metrics UI
-      $('#mNew').textContent=metrics.new; $('#mProd').textContent=metrics.prod; $('#mQCP').textContent=metrics.qcp; $('#mShip').textContent=metrics.ship; $('#mCancel').textContent=metrics.cancel;
+      $('#mNew').textContent=metrics.new; $('#mProd').textContent=metrics.prod;
+      $('#mQCP').textContent=metrics.qcp; $('#mShip').textContent=metrics.ship; $('#mCancel').textContent=metrics.cancel;
     });
 
-    // modal
+    // modal close
     $('#mClose').onclick=()=> $('#orderModal').classList.remove('open');
     $('#orderModal').addEventListener('click',(e)=>{ if(e.target.id==='orderModal') e.currentTarget.classList.remove('open');});
   </script>
