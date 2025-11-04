@@ -3,22 +3,20 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>KJ Orders — Multi-Item Workflow (Beautiful + Safe Save)</title>
+  <title>KJ Orders — Simple Photos Workflow</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     .thumb{width:64px;height:64px;object-fit:cover;border:1px solid #e5e7eb;border-radius:10px}
     .chip{border-radius:999px;padding:2px 10px;font-size:12px}
-    .card{background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:14px;box-shadow:0 4px 18px rgba(0,0,0,.04)}
+    .card{background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:14px;box-shadow:0 6px 20px rgba(0,0,0,.05)}
     .sticky-tabs{position:sticky;top:0;z-index:30;background:linear-gradient(#f8fafc,#f8fafc)}
-    .btn{border-radius:12px;padding:.55rem .9rem}
+    .btn{border-radius:12px;padding:.58rem .9rem}
     .btn-main{background:#1f6feb;color:#fff}
     .btn-sub{background:#eef2ff}
     .btn-border{border:1px solid #e5e7eb;background:#fff}
-    /* Simple toast */
     #toast{position:fixed;left:50%;transform:translateX(-50%);bottom:16px;z-index:50}
-    .fade-in{animation:fade-in .25s ease}
+    .fade-in{animation:fade-in .24s ease}
     @keyframes fade-in{from{opacity:.3;transform:translate(-50%,8px)}to{opacity:1;transform:translate(-50%,0)}}
-    /* Modal */
     .modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;padding:16px;z-index:40}
     .modal.open{display:flex}
   </style>
@@ -27,7 +25,7 @@
   <div class="max-w-7xl mx-auto p-4">
     <header class="mb-2">
       <h1 class="text-2xl font-semibold">KJ Orders</h1>
-      <p class="text-xs text-slate-500">Intake → Stock → Order Manager → QC/Dispatch (Firebase)</p>
+      <p class="text-xs text-slate-500">Fast intake with photos → Stock notes → QC & Dispatch</p>
     </header>
 
     <!-- Tabs -->
@@ -38,19 +36,19 @@
         <button class="tab btn btn-sub border text-slate-700" data-tab="stock">2) Stock</button>
         <button class="tab btn btn-sub border text-slate-700" data-tab="ordermgr">3) Order Mgr</button>
         <button class="tab btn btn-sub border text-slate-700" data-tab="qc">4) QC / Dispatch</button>
-        <span class="ml-auto"></span>
-        <span id="whoami" class="text-xs text-slate-500 self-center"></span>
+        <span class="ml-auto text-xs self-center" id="whoami"></span>
       </div>
     </nav>
 
     <!-- DASHBOARD -->
     <section id="view-dashboard" class="card">
       <h2 class="font-medium mb-2">Overview</h2>
-      <div class="grid sm:grid-cols-4 gap-3 mb-3">
+      <div class="grid sm:grid-cols-5 gap-3 mb-3">
         <div class="p-3 rounded-xl bg-blue-50"><div class="text-xs text-slate-600">New</div><div id="mNew" class="text-2xl font-bold">0</div></div>
         <div class="p-3 rounded-xl bg-amber-50"><div class="text-xs text-slate-600">In Production</div><div id="mProd" class="text-2xl font-bold">0</div></div>
         <div class="p-3 rounded-xl bg-indigo-50"><div class="text-xs text-slate-600">QC Pending</div><div id="mQCP" class="text-2xl font-bold">0</div></div>
         <div class="p-3 rounded-xl bg-emerald-50"><div class="text-xs text-slate-600">Shipped</div><div id="mShip" class="text-2xl font-bold">0</div></div>
+        <div class="p-3 rounded-xl bg-rose-50"><div class="text-xs text-slate-600">Canceled</div><div id="mCancel" class="text-2xl font-bold">0</div></div>
       </div>
       <div class="overflow-auto">
         <table class="w-full text-sm" id="tblDash">
@@ -60,9 +58,9 @@
               <th class="p-2 text-left">Order</th>
               <th class="p-2 text-left">Customer</th>
               <th class="p-2 text-left">Source</th>
-              <th class="p-2 text-left">Items</th>
               <th class="p-2 text-left">Status</th>
               <th class="p-2 text-left">View</th>
+              <th class="p-2 text-left">Cancel</th>
             </tr>
           </thead>
           <tbody></tbody>
@@ -85,55 +83,40 @@
         <div>
           <label class="text-xs text-slate-600">Source</label>
           <select name="source" class="w-full border rounded-xl px-3 py-2">
-            <option>K Etsy</option>
-            <option>Anirudh Etsy</option>
-            <option>Website</option>
-            <option>Others</option>
+            <option>K Etsy</option><option>Anirudh Etsy</option><option>Website</option><option>Others</option>
           </select>
         </div>
         <div>
           <label class="text-xs text-slate-600">Courier</label>
           <select name="courier" class="w-full border rounded-xl px-3 py-2">
-            <option>OnPoint</option>
-            <option>Sardar</option>
-            <option>Others</option>
+            <option>OnPoint</option><option>Sardar</option><option>Others</option>
           </select>
         </div>
         <div class="md:col-span-2">
-          <label class="text-xs text-slate-600">Remarks</label>
+          <label class="text-xs text-slate-600">Remarks (optional)</label>
           <input name="remarks" class="w-full border rounded-xl px-3 py-2" placeholder="Customer notes…">
         </div>
-
         <div class="md:col-span-2">
-          <label class="text-xs text-slate-600">Order photos (Etsy screenshots)</label>
+          <label class="text-xs text-slate-600">Order photos (Etsy screenshots) — multiple</label>
           <input id="intakePhoto" type="file" accept="image/*" multiple class="w-full border rounded-xl px-3 py-2">
           <div id="intakePreview" class="mt-2 flex gap-2"></div>
         </div>
-
         <div class="md:col-span-2">
-          <div class="flex items-center justify-between mb-1">
-            <label class="text-xs text-slate-600">Items in order</label>
-            <button type="button" id="addItem" class="btn btn-border text-slate-700">+ Add item</button>
-          </div>
-          <div id="itemsWrap" class="grid gap-2"></div>
-        </div>
-
-        <div class="md:col-span-2 flex gap-2">
           <button id="btnAddOrder" class="btn btn-main" type="submit">Add Order</button>
-          <span class="text-xs text-slate-500 self-center">(Don’t double-click — we’ll show “Saved ✅”)</span>
+          <span class="text-xs text-slate-500 ml-2">(we’ll show Saved ✅)</span>
         </div>
       </form>
     </section>
 
     <!-- STOCK -->
     <section id="view-stock" class="card hidden">
-      <h2 class="font-medium mb-2">2) Stock Manager — Ready vs To Make</h2>
+      <h2 class="font-medium mb-2">2) Stock — Ready vs To Make</h2>
       <div id="stockList" class="grid gap-3"></div>
     </section>
 
     <!-- ORDER MANAGER -->
     <section id="view-ordermgr" class="card hidden">
-      <h2 class="font-medium mb-2">3) Order Manager — Sent to QC</h2>
+      <h2 class="font-medium mb-2">3) Order Manager — Send to QC</h2>
       <div id="orderMgrList" class="grid gap-3"></div>
     </section>
 
@@ -144,7 +127,7 @@
     </section>
   </div>
 
-  <!-- Order detail modal (shows all photos) -->
+  <!-- Order detail modal (all photos) -->
   <div id="orderModal" class="modal">
     <div class="bg-white rounded-2xl p-4 max-w-3xl w-full">
       <div class="flex items-center justify-between mb-2">
@@ -158,19 +141,19 @@
   <!-- Toast -->
   <div id="toast"></div>
 
-  <!-- Firebase logic -->
+  <!-- Firebase -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
     import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
     import { getFirestore, collection, addDoc, doc, onSnapshot, orderBy, query, serverTimestamp, updateDoc, where, getDocs } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
     import { getStorage, ref as sRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-storage.js";
 
-    // --- CONFIG ---
+    // 🔧 FIXED BUCKET (.appspot.com)
     const firebaseConfig = {
       apiKey: "AIzaSyCcFWt73v5_fq2nqvCTkxh98Zd48ZesllY",
       authDomain: "order-management-portal-edc78.firebaseapp.com",
       projectId: "order-management-portal-edc78",
-      storageBucket: "order-management-portal-edc78.appspot.com",
+      storageBucket: "order-management-portal-edc78.appspot.com",   // ✅ correct
       messagingSenderId: "1064944592307",
       appId: "1:1064944592307:web:d985383a3d47e097b357c6"
     };
@@ -180,9 +163,10 @@
     const db = getFirestore(app);
     const storage = getStorage(app);
 
+    // Tabs
     const tabs = document.querySelectorAll('.tab');
     const views = { dashboard:'#view-dashboard', intake:'#view-intake', stock:'#view-stock', ordermgr:'#view-ordermgr', qc:'#view-qc' };
-    function show(id){ Object.values(views).forEach(v=>document.querySelector(v).classList.add('hidden')); document.querySelector(views[id]).classList.remove('hidden'); tabs.forEach(b=>{ const active=b.dataset.tab===id; b.classList.toggle('bg-black',active); b.classList.toggle('text-white',active); b.classList.toggle('btn-sub',!active); });}
+    function show(id){ Object.values(views).forEach(v=>document.querySelector(v).classList.add('hidden')); document.querySelector(views[id]).classList.remove('hidden'); tabs.forEach(b=>{ const a=b.dataset.tab===id; b.classList.toggle('bg-black',a); b.classList.toggle('text-white',a); b.classList.toggle('btn-sub',!a);});}
     tabs.forEach(b=> b.onclick = ()=> show(b.dataset.tab));
     show('dashboard');
 
@@ -192,194 +176,167 @@
 
     // Helpers
     const ORDERS = collection(db, 'orders');
-    const STATUS = { NEW:'New', PROD:'In Production', QCP:'QC Pending', SHIP:'Shipped' };
-    const $ = s => document.querySelector(s);
-    const el = h => { const t=document.createElement('template'); t.innerHTML=h.trim(); return t.content.firstChild; };
-    const toast = (msg,ok=true)=>{ const n=el(`<div class="fade-in bg-white border rounded-xl px-3 py-2 shadow text-sm ${ok?'border-emerald-300':'border-rose-300'}">${msg}</div>`); const t=$('#toast'); t.appendChild(n); setTimeout(()=>n.remove(), 2200); };
+    const STATUS = { NEW:'New', PROD:'In Production', QCP:'QC Pending', SHIP:'Shipped', CANCEL:'Canceled' };
+    const $ = s=>document.querySelector(s);
+    const el = h=>{ const t=document.createElement('template'); t.innerHTML=h.trim(); return t.content.firstChild; };
+    const toast = (msg,ok=true)=>{ const n=el(`<div class="fade-in bg-white border rounded-xl px-3 py-2 shadow text-sm ${ok?'border-emerald-300':'border-rose-300'}">${msg}</div>`); const t=$('#toast'); t.appendChild(n); setTimeout(()=>n.remove(),2200); };
 
-    // Intake items UI
-    const itemsWrap = $('#itemsWrap');
-    function addItemRow(v={name:'',qty:1}){
-      const r = el(`<div class="grid grid-cols-12 gap-2 border rounded-xl p-2">
-        <input class="col-span-8 border rounded-xl px-2 py-1" placeholder="Item / SKU" value="${v.name}">
-        <input type="number" min="1" class="col-span-3 border rounded-xl px-2 py-1" value="${v.qty||1}">
-        <button type="button" class="col-span-1 btn btn-border text-rose-600">×</button>
-      </div>`);
-      r.querySelector('button').onclick = ()=> r.remove();
-      itemsWrap.appendChild(r);
-    }
-    $('#addItem').onclick = ()=> addItemRow();
-    addItemRow(); // one default row
+    // Intake preview
+    const intakePhoto = $('#intakePhoto'), intakePreview=$('#intakePreview');
+    intakePhoto.onchange = ()=>{ intakePreview.innerHTML=''; [...(intakePhoto.files||[])].forEach(f=> intakePreview.appendChild(el(`<img class="thumb" src="${URL.createObjectURL(f)}">`))); };
 
-    // intake photo preview (multiple)
-    const intakePhoto = $('#intakePhoto'), intakePreview = $('#intakePreview');
-    intakePhoto.onchange = ()=>{ intakePreview.innerHTML=''; [...intakePhoto.files].forEach(f=> intakePreview.appendChild(el(`<img class="thumb" src="${URL.createObjectURL(f)}">`))); };
-
-    // ADD ORDER (safe)
-    const form = $('#formIntake'); const btnAdd = $('#btnAddOrder');
+    // ADD ORDER (simple + safe + photos)
+    const form=$('#formIntake'); const btnAdd=$('#btnAddOrder');
     form.onsubmit = async (e)=>{
-      e.preventDefault();
-      if(btnAdd.disabled) return;
-      // build items
-      const items = [...itemsWrap.children].map(r=>{
-        const [nameEl, qtyEl] = r.querySelectorAll('input');
-        return {name:nameEl.value.trim(), qty:parseInt(qtyEl.value||1,10), inStock:false, toArtisan:false, notes:'', sentToQCAt:null};
-      }).filter(i=>i.name);
-      if(!items.length){ toast('Add at least one item', false); return; }
+      e.preventDefault(); if(btnAdd.disabled) return;
+      const fd=new FormData(form); const orderId=(fd.get('orderId')||'').trim();
+      if(!orderId){ toast('Order ID required',false); return; }
+      btnAdd.disabled=true; toast('Saving…');
 
-      const fd = new FormData(form);
-      const orderId = (fd.get('orderId')||'').trim();
-      if(!orderId){ toast('Order ID required', false); return; }
-
-      // prevent duplicates by Order ID
-      btnAdd.disabled = true; toast('Saving…');
       try{
-        const exists = await getDocs(query(ORDERS, where('orderId','==', orderId)));
-        if(!exists.empty){ btnAdd.disabled=false; toast('Order ID already exists ❌', false); return; }
+        // stop duplicates
+        const exists=await getDocs(query(ORDERS, where('orderId','==',orderId)));
+        if(!exists.empty){ toast('Order ID already exists ❌',false); btnAdd.disabled=false; return; }
 
-        const data = {
-          orderId, customer: fd.get('customer'), source: fd.get('source'),
-          courier: fd.get('courier'), remarks: fd.get('remarks')||'',
-          status: STATUS.NEW, createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
-          intakePhotos: [], items, qc:{ tracking:'', parcelPhotos:[] }
+        const data={
+          orderId,
+          customer:fd.get('customer'),
+          source:fd.get('source'),
+          courier:fd.get('courier'),
+          remarks:fd.get('remarks')||'',
+          status:STATUS.NEW,
+          createdAt:serverTimestamp(),
+          updatedAt:serverTimestamp(),
+          intakePhotos:[],
+          // simple progress flags + notes
+          progress:{ inStock:false, toArtisan:false, sentToQC:false, sentToQCAt:null },
+          stockNotes:'',
+          orderMgrNotes:'',
+          qc:{ tracking:'', parcelPhotos:[] }
         };
-        const ref = await addDoc(ORDERS, data);
+        const ref=await addDoc(ORDERS,data);
 
-        // upload ALL selected photos
-        const files = [...(intakePhoto.files||[])];
-        const urls = [];
+        // upload photos (with error toasts)
+        const files=[...(intakePhoto.files||[])]; const urls=[];
         for(const f of files){
-          const path = `orders/${ref.id}/intake_${Date.now()}_${f.name}`;
-          await uploadBytes(sRef(storage, path), f);
-          const url = await getDownloadURL(sRef(storage, path));
-          urls.push(url);
+          try{
+            const path=`orders/${ref.id}/intake_${Date.now()}_${f.name}`;
+            const r=sRef(storage,path); await uploadBytes(r,f);
+            const url=await getDownloadURL(r); urls.push(url);
+          }catch(err){ console.error(err); toast('Upload failed',false); }
         }
-        if(urls.length){
-          await updateDoc(doc(db,'orders',ref.id), { intakePhotos: urls, updatedAt: serverTimestamp() });
-        }
+        if(urls.length){ await updateDoc(doc(db,'orders',ref.id), { intakePhotos:urls, updatedAt:serverTimestamp() }); }
 
-        form.reset(); itemsWrap.innerHTML=''; addItemRow(); intakePreview.innerHTML='';
+        form.reset(); intakePreview.innerHTML='';
         toast('Order saved ✅'); show('dashboard');
-      }catch(err){ console.error(err); toast('Failed to save order ❌', false); }
-      finally{ btnAdd.disabled = false; }
+      }catch(err){ console.error(err); toast('Failed to save order ❌',false); }
+      finally{ btnAdd.disabled=false; }
     };
 
     // LIVE FEED
-    const m = {new:0,prod:0,qcp:0,ship:0};
-    const q = query(ORDERS, orderBy('createdAt','desc'));
+    const metrics={new:0,prod:0,qcp:0,ship:0,cancel:0};
+    const q=query(ORDERS, orderBy('createdAt','desc'));
     onSnapshot(q, snap=>{
-      m.new=m.prod=m.qcp=m.ship=0;
+      metrics.new=metrics.prod=metrics.qcp=metrics.ship=metrics.cancel=0;
 
-      // clear views
-      const dashTbody = $('#tblDash tbody'); dashTbody.innerHTML='';
-      const stockList = $('#stockList'); stockList.innerHTML='';
-      const orderMgrList = $('#orderMgrList'); orderMgrList.innerHTML='';
-      const qcList = $('#qcList'); qcList.innerHTML='';
+      const dashTbody=$('#tblDash tbody'); dashTbody.innerHTML='';
+      const stockList=$('#stockList'); stockList.innerHTML='';
+      const orderMgrList=$('#orderMgrList'); orderMgrList.innerHTML='';
+      const qcList=$('#qcList'); qcList.innerHTML='';
 
       snap.forEach(d=>{
-        const o = {id:d.id, ...d.data()};
-        if(o.status===STATUS.NEW)m.new++; else if(o.status===STATUS.PROD)m.prod++; else if(o.status===STATUS.QCP)m.qcp++; else if(o.status===STATUS.SHIP)m.ship++;
+        const o={id:d.id, ...d.data()};
+        if(o.status===STATUS.NEW) metrics.new++;
+        else if(o.status===STATUS.PROD) metrics.prod++;
+        else if(o.status===STATUS.QCP) metrics.qcp++;
+        else if(o.status===STATUS.SHIP) metrics.ship++;
+        else if(o.status===STATUS.CANCEL) metrics.cancel++;
 
-        const total = (o.items||[]).reduce((a,i)=>a+(i.qty||1),0);
-        const pics = o.intakePhotos||[];
+        const pics=o.intakePhotos||[];
+        const chipClass=o.status===STATUS.NEW ? 'bg-blue-100 text-blue-800'
+                    : o.status===STATUS.PROD ? 'bg-amber-100 text-amber-800'
+                    : o.status===STATUS.QCP ? 'bg-indigo-100 text-indigo-800'
+                    : o.status===STATUS.SHIP ? 'bg-emerald-100 text-emerald-800'
+                    : 'bg-rose-100 text-rose-800';
 
-        // Dashboard row (show thumbnails + view button)
+        // Dashboard row (hide cancel button if shipped/canceled)
         dashTbody.appendChild(el(`<tr>
           <td class="p-2"><div class="flex gap-2">${pics.length?pics.map(u=>`<a href="${u}" target="_blank"><img class="thumb" src="${u}"></a>`).join(''):'-'}</div></td>
           <td class="p-2 font-medium">${o.orderId}</td>
           <td class="p-2">${o.customer||''}</td>
           <td class="p-2">${o.source||''}</td>
-          <td class="p-2">${total}</td>
-          <td class="p-2">
-            <span class="chip ${o.status===STATUS.NEW?'bg-blue-100 text-blue-700':o.status===STATUS.PROD?'bg-amber-100 text-amber-800':o.status===STATUS.QCP?'bg-indigo-100 text-indigo-800':'bg-emerald-100 text-emerald-800'}">${o.status}</span>
-          </td>
-          <td class="p-2"><button class="btn btn-border text-slate-700" data-view="${o.id}">View</button></td>
+          <td class="p-2"><span class="chip ${chipClass}">${o.status}</span></td>
+          <td class="p-2"><button class="btn btn-border" data-view="${o.id}">View</button></td>
+          <td class="p-2">${[STATUS.SHIP,STATUS.CANCEL].includes(o.status)?'-':`<button class="btn btn-border text-rose-600" data-cancel="${o.id}">Cancel</button>`}</td>
         </tr>`));
 
-        // STOCK manager card (per item toggles)
-        if([STATUS.NEW, STATUS.PROD].includes(o.status)){
-          const c = el(`<div class="border rounded-2xl p-3">
-            <div class="flex items-center justify-between">
+        // STOCK (notes + toggles)
+        if([STATUS.NEW,STATUS.PROD].includes(o.status)){
+          const c=el(`<div class="border rounded-2xl p-3">
+            <div class="flex items-center justify-between mb-1">
               <div class="font-medium">${o.orderId} <span class="text-xs text-slate-500">• ${o.customer}</span></div>
               <div class="flex gap-2">${pics.map(u=>`<a href="${u}" target="_blank"><img class="thumb" src="${u}"></a>`).join('')}</div>
             </div>
-            <div class="overflow-auto mt-2">
-              <table class="w-full text-sm">
-                <thead class="bg-slate-100"><tr>
-                  <th class="p-2 text-left">Item</th><th class="p-2">Qty</th><th class="p-2">In Stock</th><th class="p-2">To Artisan</th><th class="p-2 text-left">Notes</th><th class="p-2">Save</th>
-                </tr></thead>
-                <tbody></tbody>
-              </table>
+            <div class="grid sm:grid-cols-2 gap-2 text-sm">
+              <label class="flex items-center gap-2"><input type="checkbox" ${o.progress?.inStock?'checked':''} data-k="inStock"> In Stock (ready now)</label>
+              <label class="flex items-center gap-2"><input type="checkbox" ${o.progress?.toArtisan?'checked':''} data-k="toArtisan"> Give to Artisan</label>
+              <div class="sm:col-span-2">
+                <div class="text-xs text-slate-500 mb-1">Stock notes</div>
+                <textarea class="border rounded-xl px-2 py-1 w-full" rows="2" data-k="stockNotes">${o.stockNotes||''}</textarea>
+              </div>
+              <div class="sm:col-span-2 flex gap-2">
+                <button class="btn btn-border save">Save</button>
+              </div>
             </div>
           </div>`);
-          const tb = c.querySelector('tbody');
-          (o.items||[]).forEach((it,idx)=>{
-            const r = el(`<tr>
-              <td class="p-2">${it.name}</td>
-              <td class="p-2 text-center">${it.qty||1}</td>
-              <td class="p-2 text-center"><input type="checkbox" ${it.inStock?'checked':''} data-k="inStock"></td>
-              <td class="p-2 text-center"><input type="checkbox" ${it.toArtisan?'checked':''} data-k="toArtisan"></td>
-              <td class="p-2"><input class="border rounded-xl px-2 py-1 w-60" value="${it.notes||''}" data-k="notes"></td>
-              <td class="p-2"><button class="btn btn-border">Save</button></td>
-            </tr>`);
-            r.querySelector('button').onclick = async ()=>{
-              const inStock = r.querySelector('[data-k="inStock"]').checked;
-              const toArtisan = r.querySelector('[data-k="toArtisan"]').checked;
-              const notes = r.querySelector('[data-k="notes"]').value;
-              const newItems = [...o.items]; newItems[idx] = {...it, inStock, toArtisan, notes};
-              const nextStatus = newItems.some(x=>x.toArtisan && !x.sentToQCAt) ? STATUS.PROD :
-                                newItems.every(x=>x.inStock || x.sentToQCAt) ? STATUS.QCP : STATUS.NEW;
-              await updateDoc(doc(db,'orders',o.id), { items:newItems, status: nextStatus, updatedAt: serverTimestamp() });
-              toast('Saved ✅');
-            };
-            tb.appendChild(r);
-          });
+          c.querySelector('.save').onclick = async ()=>{
+            const inStock = c.querySelector('[data-k="inStock"]').checked;
+            const toArtisan = c.querySelector('[data-k="toArtisan"]').checked;
+            const stockNotes = c.querySelector('[data-k="stockNotes"]').value;
+            let next = STATUS.NEW;
+            if (toArtisan && !(o.progress?.sentToQC)) next=STATUS.PROD;
+            if (inStock || o.progress?.sentToQC) next=STATUS.QCP;
+            await updateDoc(doc(db,'orders',o.id), { 
+              progress:{...(o.progress||{}), inStock, toArtisan}, 
+              stockNotes, status: next, updatedAt:serverTimestamp() 
+            });
+            toast('Saved ✅');
+          };
           stockList.appendChild(c);
         }
 
-        // ORDER MANAGER: mark sent to QC (+ pics visible)
-        if([STATUS.PROD, STATUS.NEW].includes(o.status)){
-          const pending = (o.items||[]).some(i=>!i.inStock && !i.sentToQCAt);
-          if(pending){
-            const c = el(`<div class="border rounded-2xl p-3">
-              <div class="font-medium mb-1">${o.orderId} <span class="text-xs text-slate-500">• ${o.customer}</span></div>
-              <div class="flex gap-2 mb-2">${pics.map(u=>`<a href="${u}" target="_blank"><img class="thumb" src="${u}"></a>`).join('')}</div>
-              <div class="overflow-auto">
-                <table class="w-full text-sm">
-                  <thead class="bg-slate-100"><tr><th class="p-2 text-left">Item</th><th class="p-2">Qty</th><th class="p-2 text-left">Notes</th><th class="p-2">Sent to QC</th></tr></thead>
-                  <tbody></tbody>
-                </table>
-              </div>
-            </div>`);
-            const tb = c.querySelector('tbody');
-            (o.items||[]).forEach((it,idx)=>{
-              if(it.inStock) return;
-              const r = el(`<tr>
-                <td class="p-2">${it.name}</td>
-                <td class="p-2 text-center">${it.qty||1}</td>
-                <td class="p-2"><input class="border rounded-xl px-2 py-1 w-60" value="${it.notes||''}" data-k="notes"></td>
-                <td class="p-2"><button class="btn btn-border">Mark + Date</button></td>
-              </tr>`);
-              r.querySelector('button').onclick = async ()=>{
-                const notes = r.querySelector('[data-k="notes"]').value;
-                const newItems = [...o.items]; newItems[idx] = {...it, notes, sentToQCAt:new Date().toISOString()};
-                const nextStatus = newItems.every(x=>x.inStock || x.sentToQCAt) ? STATUS.QCP : STATUS.PROD;
-                await updateDoc(doc(db,'orders',o.id), { items:newItems, status: nextStatus, updatedAt: serverTimestamp() });
-                toast('Marked sent to QC ✅');
-              };
-              tb.appendChild(r);
+        // ORDER MANAGER (notes + mark sent to QC)
+        if([STATUS.PROD,STATUS.NEW].includes(o.status)){
+          const c=el(`<div class="border rounded-2xl p-3">
+            <div class="font-medium mb-1">${o.orderId} <span class="text-xs text-slate-500">• ${o.customer}</span></div>
+            <div class="flex gap-2 mb-2">${pics.map(u=>`<a href="${u}" target="_blank"><img class="thumb" src="${u}"></a>`).join('')}</div>
+            <div class="text-xs text-slate-500 mb-1">Order Manager notes</div>
+            <textarea class="border rounded-xl px-2 py-1 w-full mb-2" rows="2" data-k="orderMgrNotes">${o.orderMgrNotes||''}</textarea>
+            <div class="flex gap-2">
+              <button class="btn btn-border save">Save</button>
+              <button class="btn btn-main qc">Mark Sent to QC</button>
+            </div>
+          </div>`);
+          c.querySelector('.save').onclick = async ()=>{
+            const orderMgrNotes = c.querySelector('[data-k="orderMgrNotes"]').value;
+            await updateDoc(doc(db,'orders',o.id), { orderMgrNotes, updatedAt:serverTimestamp() });
+            toast('Notes saved ✅');
+          };
+          c.querySelector('.qc').onclick = async ()=>{
+            await updateDoc(doc(db,'orders',o.id), { 
+              progress:{...(o.progress||{}), sentToQC:true, sentToQCAt:new Date().toISOString()}, 
+              status:STATUS.QCP, updatedAt:serverTimestamp() 
             });
-            orderMgrList.appendChild(c);
-          }
+            toast('Marked sent to QC ✅');
+          };
+          orderMgrList.appendChild(c);
         }
 
-        // QC: show order photos + upload parcel photos
-        if([STATUS.PROD, STATUS.QCP].includes(o.status)){
-          const parcel = (o.qc?.parcelPhotos||[]);
-          const c = el(`<div class="border rounded-2xl p-3">
-            <div class="flex items-center justify-between mb-1">
-              <div class="font-medium">${o.orderId} <span class="text-xs text-slate-500">• ${o.customer}</span></div>
-            </div>
+        // QC (order photos + parcel photos + tracking + ship)
+        if([STATUS.PROD,STATUS.QCP].includes(o.status)){
+          const parcel=(o.qc?.parcelPhotos||[]);
+          const c=el(`<div class="border rounded-2xl p-3">
+            <div class="font-medium mb-1">${o.orderId} <span class="text-xs text-slate-500">• ${o.customer}</span></div>
             <div class="mb-2">
               <div class="text-xs text-slate-500 mb-1">Order Photos</div>
               <div class="flex gap-2">${pics.map(u=>`<a href="${u}" target="_blank"><img class="thumb" src="${u}"></a>`).join('')||'-'}</div>
@@ -398,48 +355,54 @@
               </div>
             </div>
           </div>`);
-
-          // upload parcel
           c.querySelector('.file').onchange = async (e)=>{
-            const f = e.target.files?.[0]; if(!f) return;
-            const path = `orders/${o.id}/parcel_${Date.now()}_${f.name}`;
-            await uploadBytes(sRef(storage, path), f);
-            const url = await getDownloadURL(sRef(storage, path));
-            const photos = (o.qc?.parcelPhotos||[]).concat(url);
-            await updateDoc(doc(db,'orders',o.id), { 'qc.parcelPhotos': photos, status: STATUS.QCP, updatedAt: serverTimestamp() });
+            const f=e.target.files?.[0]; if(!f) return;
+            const path=`orders/${o.id}/parcel_${Date.now()}_${f.name}`;
+            const r=sRef(storage,path); await uploadBytes(r,f);
+            const url=await getDownloadURL(r);
+            const photos=(o.qc?.parcelPhotos||[]).concat(url);
+            await updateDoc(doc(db,'orders',o.id), { 'qc.parcelPhotos':photos, status:STATUS.QCP, updatedAt:serverTimestamp() });
             toast('Photo added ✅');
           };
           c.querySelector('.save').onclick = async ()=>{
-            const tracking = c.querySelector('.track').value;
-            await updateDoc(doc(db,'orders',o.id), { qc:{ ...(o.qc||{}), tracking }, status: STATUS.QCP, updatedAt: serverTimestamp() });
+            const tracking=c.querySelector('.track').value;
+            await updateDoc(doc(db,'orders',o.id), { qc:{...(o.qc||{}), tracking}, updatedAt:serverTimestamp() });
             toast('QC saved ✅');
           };
           c.querySelector('.ship').onclick = async ()=>{
-            await updateDoc(doc(db,'orders',o.id), { status: STATUS.SHIP, updatedAt: serverTimestamp() });
+            await updateDoc(doc(db,'orders',o.id), { status:STATUS.SHIP, updatedAt:serverTimestamp() });
             toast('Marked shipped ✅');
           };
-
           qcList.appendChild(c);
         }
 
-        // detail modal open
+        // View modal + Cancel handlers
         document.querySelectorAll(`[data-view="${o.id}"]`).forEach(btn=>{
-          btn.onclick = ()=>{
-            $('#mTitle').textContent = `${o.orderId} — ${o.customer||''}`;
-            const box = $('#mPhotos'); box.innerHTML='';
+          btn.onclick=()=>{
+            $('#mTitle').textContent=`${o.orderId} — ${o.customer||''}`;
+            const box=$('#mPhotos'); box.innerHTML='';
             (o.intakePhotos||[]).forEach(u=> box.appendChild(el(`<a href="${u}" target="_blank"><img class="thumb" src="${u}"></a>`)));
             $('#orderModal').classList.add('open');
+          };
+        });
+
+        document.querySelectorAll(`[data-cancel="${o.id}"]`).forEach(btn=>{
+          btn.onclick=async ()=>{
+            const reason=prompt('Cancel reason (optional):','Client canceled');
+            if(reason===null) return; // user pressed Cancel
+            await updateDoc(doc(db,'orders',o.id), { status:STATUS.CANCEL, canceledAt:serverTimestamp(), canceledReason:reason||'' });
+            toast('Order canceled');
           };
         });
       });
 
       // metrics UI
-      $('#mNew').textContent=m.new; $('#mProd').textContent=m.prod; $('#mQCP').textContent=m.qcp; $('#mShip').textContent=m.ship;
+      $('#mNew').textContent=metrics.new; $('#mProd').textContent=metrics.prod; $('#mQCP').textContent=metrics.qcp; $('#mShip').textContent=metrics.ship; $('#mCancel').textContent=metrics.cancel;
     });
 
-    // modal events
-    $('#mClose').onclick = ()=> $('#orderModal').classList.remove('open');
-    $('#orderModal').addEventListener('click', (e)=>{ if(e.target.id==='orderModal') e.currentTarget.classList.remove('open'); });
+    // modal
+    $('#mClose').onclick=()=> $('#orderModal').classList.remove('open');
+    $('#orderModal').addEventListener('click',(e)=>{ if(e.target.id==='orderModal') e.currentTarget.classList.remove('open');});
   </script>
 </body>
 </html>
