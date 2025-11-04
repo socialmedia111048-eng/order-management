@@ -3,50 +3,68 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>KJ Orders — Multi-Item Workflow</title>
+  <title>KJ Orders — Multi-Item Workflow (Beautiful + Safe Save)</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    .thumb{width:56px;height:56px;object-fit:cover;border:1px solid #e5e7eb;border-radius:8px}
-    .pill{border-radius:999px;padding:2px 8px;font-size:12px}
-    .card{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:16px}
+    .thumb{width:64px;height:64px;object-fit:cover;border:1px solid #e5e7eb;border-radius:10px}
+    .chip{border-radius:999px;padding:2px 10px;font-size:12px}
+    .card{background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:14px;box-shadow:0 4px 18px rgba(0,0,0,.04)}
+    .sticky-tabs{position:sticky;top:0;z-index:30;background:linear-gradient(#f8fafc,#f8fafc)}
+    .btn{border-radius:12px;padding:.55rem .9rem}
+    .btn-main{background:#1f6feb;color:#fff}
+    .btn-sub{background:#eef2ff}
+    .btn-border{border:1px solid #e5e7eb;background:#fff}
+    /* Simple toast */
+    #toast{position:fixed;left:50%;transform:translateX(-50%);bottom:16px;z-index:50}
+    .fade-in{animation:fade-in .25s ease}
+    @keyframes fade-in{from{opacity:.3;transform:translate(-50%,8px)}to{opacity:1;transform:translate(-50%,0)}}
+    /* Modal */
+    .modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;padding:16px;z-index:40}
+    .modal.open{display:flex}
   </style>
 </head>
-<body class="bg-gray-50 text-gray-900">
+<body class="bg-slate-50 text-slate-900">
   <div class="max-w-7xl mx-auto p-4">
-    <header class="mb-3">
-      <h1 class="text-xl font-semibold">KJ Orders</h1>
-      <p class="text-xs text-gray-500">Intake → Stock → Order Manager → QC/Dispatch (Firebase)</p>
+    <header class="mb-2">
+      <h1 class="text-2xl font-semibold">KJ Orders</h1>
+      <p class="text-xs text-slate-500">Intake → Stock → Order Manager → QC/Dispatch (Firebase)</p>
     </header>
 
-    <!-- Top Nav -->
-    <nav class="flex gap-2 mb-3">
-      <button class="tab px-3 py-2 border rounded bg-black text-white" data-tab="dashboard">Dashboard</button>
-      <button class="tab px-3 py-2 border rounded bg-white" data-tab="intake">1) Intake</button>
-      <button class="tab px-3 py-2 border rounded bg-white" data-tab="stock">2) Stock Manager</button>
-      <button class="tab px-3 py-2 border rounded bg-white" data-tab="ordermgr">3) Order Manager</button>
-      <button class="tab px-3 py-2 border rounded bg-white" data-tab="qc">4) QC / Dispatch</button>
-      <span class="ml-auto text-xs text-gray-500" id="whoami"></span>
+    <!-- Tabs -->
+    <nav class="sticky-tabs border-b mb-3">
+      <div class="flex gap-2 py-2">
+        <button class="tab btn btn-sub border text-slate-700" data-tab="dashboard">Dashboard</button>
+        <button class="tab btn btn-sub border text-slate-700" data-tab="intake">1) Intake</button>
+        <button class="tab btn btn-sub border text-slate-700" data-tab="stock">2) Stock</button>
+        <button class="tab btn btn-sub border text-slate-700" data-tab="ordermgr">3) Order Mgr</button>
+        <button class="tab btn btn-sub border text-slate-700" data-tab="qc">4) QC / Dispatch</button>
+        <span class="ml-auto"></span>
+        <span id="whoami" class="text-xs text-slate-500 self-center"></span>
+      </div>
     </nav>
 
     <!-- DASHBOARD -->
     <section id="view-dashboard" class="card">
       <h2 class="font-medium mb-2">Overview</h2>
       <div class="grid sm:grid-cols-4 gap-3 mb-3">
-        <div class="p-3 rounded-xl bg-blue-50"><div class="text-xs text-gray-500">New</div><div id="mNew" class="text-2xl font-bold">0</div></div>
-        <div class="p-3 rounded-xl bg-amber-50"><div class="text-xs text-gray-500">In Production</div><div id="mProd" class="text-2xl font-bold">0</div></div>
-        <div class="p-3 rounded-xl bg-purple-50"><div class="text-xs text-gray-500">QC Pending</div><div id="mQCP" class="text-2xl font-bold">0</div></div>
-        <div class="p-3 rounded-xl bg-green-50"><div class="text-xs text-gray-500">Shipped</div><div id="mShip" class="text-2xl font-bold">0</div></div>
+        <div class="p-3 rounded-xl bg-blue-50"><div class="text-xs text-slate-600">New</div><div id="mNew" class="text-2xl font-bold">0</div></div>
+        <div class="p-3 rounded-xl bg-amber-50"><div class="text-xs text-slate-600">In Production</div><div id="mProd" class="text-2xl font-bold">0</div></div>
+        <div class="p-3 rounded-xl bg-indigo-50"><div class="text-xs text-slate-600">QC Pending</div><div id="mQCP" class="text-2xl font-bold">0</div></div>
+        <div class="p-3 rounded-xl bg-emerald-50"><div class="text-xs text-slate-600">Shipped</div><div id="mShip" class="text-2xl font-bold">0</div></div>
       </div>
       <div class="overflow-auto">
         <table class="w-full text-sm" id="tblDash">
-          <thead class="bg-gray-100"><tr>
-            <th class="p-2 text-left">Photo</th>
-            <th class="p-2 text-left">Order</th>
-            <th class="p-2 text-left">Customer</th>
-            <th class="p-2 text-left">Source</th>
-            <th class="p-2 text-left">Items</th>
-            <th class="p-2 text-left">Status</th>
-          </tr></thead>
+          <thead class="bg-slate-100">
+            <tr>
+              <th class="p-2 text-left">Photos</th>
+              <th class="p-2 text-left">Order</th>
+              <th class="p-2 text-left">Customer</th>
+              <th class="p-2 text-left">Source</th>
+              <th class="p-2 text-left">Items</th>
+              <th class="p-2 text-left">Status</th>
+              <th class="p-2 text-left">View</th>
+            </tr>
+          </thead>
           <tbody></tbody>
         </table>
       </div>
@@ -54,19 +72,19 @@
 
     <!-- INTAKE -->
     <section id="view-intake" class="card hidden">
-      <h2 class="font-medium mb-3">1) Intake — Operations Manager</h2>
+      <h2 class="font-medium mb-3">1) Intake — Operations</h2>
       <form id="formIntake" class="grid md:grid-cols-2 gap-3">
         <div>
-          <label class="text-xs text-gray-600">Order ID</label>
-          <input name="orderId" required class="w-full border rounded px-3 py-2" placeholder="KJ-2025-001">
+          <label class="text-xs text-slate-600">Order ID</label>
+          <input name="orderId" required class="w-full border rounded-xl px-3 py-2" placeholder="KJ-2025-001">
         </div>
         <div>
-          <label class="text-xs text-gray-600">Customer</label>
-          <input name="customer" required class="w-full border rounded px-3 py-2">
+          <label class="text-xs text-slate-600">Customer</label>
+          <input name="customer" required class="w-full border rounded-xl px-3 py-2">
         </div>
         <div>
-          <label class="text-xs text-gray-600">Source</label>
-          <select name="source" class="w-full border rounded px-3 py-2">
+          <label class="text-xs text-slate-600">Source</label>
+          <select name="source" class="w-full border rounded-xl px-3 py-2">
             <option>K Etsy</option>
             <option>Anirudh Etsy</option>
             <option>Website</option>
@@ -74,41 +92,40 @@
           </select>
         </div>
         <div>
-          <label class="text-xs text-gray-600">Courier</label>
-          <select name="courier" class="w-full border rounded px-3 py-2">
+          <label class="text-xs text-slate-600">Courier</label>
+          <select name="courier" class="w-full border rounded-xl px-3 py-2">
             <option>OnPoint</option>
             <option>Sardar</option>
             <option>Others</option>
           </select>
         </div>
         <div class="md:col-span-2">
-          <label class="text-xs text-gray-600">Remarks</label>
-          <input name="remarks" class="w-full border rounded px-3 py-2" placeholder="Customer notes…">
+          <label class="text-xs text-slate-600">Remarks</label>
+          <input name="remarks" class="w-full border rounded-xl px-3 py-2" placeholder="Customer notes…">
         </div>
 
-        <!-- Order Photo -->
         <div class="md:col-span-2">
-          <label class="text-xs text-gray-600">Order photo (Etsy screenshot)</label>
-          <input id="intakePhoto" type="file" accept="image/*" class="w-full border rounded px-3 py-2">
-          <div id="intakePreview" class="mt-2"></div>
+          <label class="text-xs text-slate-600">Order photos (Etsy screenshots)</label>
+          <input id="intakePhoto" type="file" accept="image/*" multiple class="w-full border rounded-xl px-3 py-2">
+          <div id="intakePreview" class="mt-2 flex gap-2"></div>
         </div>
 
-        <!-- ITEMS -->
         <div class="md:col-span-2">
           <div class="flex items-center justify-between mb-1">
-            <label class="text-xs text-gray-600">Items in this order</label>
-            <button type="button" id="addItem" class="text-xs border rounded px-2 py-1">+ Add item</button>
+            <label class="text-xs text-slate-600">Items in order</label>
+            <button type="button" id="addItem" class="btn btn-border text-slate-700">+ Add item</button>
           </div>
           <div id="itemsWrap" class="grid gap-2"></div>
         </div>
 
-        <div class="md:col-span-2">
-          <button class="px-3 py-2 bg-black text-white rounded" type="submit">Add Order</button>
+        <div class="md:col-span-2 flex gap-2">
+          <button id="btnAddOrder" class="btn btn-main" type="submit">Add Order</button>
+          <span class="text-xs text-slate-500 self-center">(Don’t double-click — we’ll show “Saved ✅”)</span>
         </div>
       </form>
     </section>
 
-    <!-- STOCK MANAGER -->
+    <!-- STOCK -->
     <section id="view-stock" class="card hidden">
       <h2 class="font-medium mb-2">2) Stock Manager — Ready vs To Make</h2>
       <div id="stockList" class="grid gap-3"></div>
@@ -116,24 +133,39 @@
 
     <!-- ORDER MANAGER -->
     <section id="view-ordermgr" class="card hidden">
-      <h2 class="font-medium mb-2">3) Order Manager — Send to QC</h2>
+      <h2 class="font-medium mb-2">3) Order Manager — Sent to QC</h2>
       <div id="orderMgrList" class="grid gap-3"></div>
     </section>
 
-    <!-- QC / DISPATCH -->
+    <!-- QC -->
     <section id="view-qc" class="card hidden">
       <h2 class="font-medium mb-2">4) QC / Dispatch</h2>
       <div id="qcList" class="grid gap-3"></div>
     </section>
   </div>
 
-  <!-- Firebase -->
+  <!-- Order detail modal (shows all photos) -->
+  <div id="orderModal" class="modal">
+    <div class="bg-white rounded-2xl p-4 max-w-3xl w-full">
+      <div class="flex items-center justify-between mb-2">
+        <div class="font-medium" id="mTitle">Order</div>
+        <button id="mClose" class="btn btn-border">Close</button>
+      </div>
+      <div id="mPhotos" class="flex flex-wrap gap-2"></div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast"></div>
+
+  <!-- Firebase logic -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
     import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
-    import { getFirestore, collection, addDoc, doc, onSnapshot, orderBy, query, serverTimestamp, updateDoc } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+    import { getFirestore, collection, addDoc, doc, onSnapshot, orderBy, query, serverTimestamp, updateDoc, where, getDocs } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
     import { getStorage, ref as sRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-storage.js";
 
+    // --- CONFIG ---
     const firebaseConfig = {
       apiKey: "AIzaSyCcFWt73v5_fq2nqvCTkxh98Zd48ZesllY",
       authDomain: "order-management-portal-edc78.firebaseapp.com",
@@ -148,10 +180,9 @@
     const db = getFirestore(app);
     const storage = getStorage(app);
 
-    // Tabs
     const tabs = document.querySelectorAll('.tab');
     const views = { dashboard:'#view-dashboard', intake:'#view-intake', stock:'#view-stock', ordermgr:'#view-ordermgr', qc:'#view-qc' };
-    function show(id){ Object.values(views).forEach(v=>document.querySelector(v).classList.add('hidden')); document.querySelector(views[id]).classList.remove('hidden'); tabs.forEach(b=>{ b.classList.toggle('bg-black', b.dataset.tab===id); b.classList.toggle('text-white', b.dataset.tab===id);});}
+    function show(id){ Object.values(views).forEach(v=>document.querySelector(v).classList.add('hidden')); document.querySelector(views[id]).classList.remove('hidden'); tabs.forEach(b=>{ const active=b.dataset.tab===id; b.classList.toggle('bg-black',active); b.classList.toggle('text-white',active); b.classList.toggle('btn-sub',!active); });}
     tabs.forEach(b=> b.onclick = ()=> show(b.dataset.tab));
     show('dashboard');
 
@@ -162,117 +193,134 @@
     // Helpers
     const ORDERS = collection(db, 'orders');
     const STATUS = { NEW:'New', PROD:'In Production', QCP:'QC Pending', SHIP:'Shipped' };
-    const $ = sel => document.querySelector(sel);
-    const el = html => { const t=document.createElement('template'); t.innerHTML=html.trim(); return t.content.firstChild; };
+    const $ = s => document.querySelector(s);
+    const el = h => { const t=document.createElement('template'); t.innerHTML=h.trim(); return t.content.firstChild; };
+    const toast = (msg,ok=true)=>{ const n=el(`<div class="fade-in bg-white border rounded-xl px-3 py-2 shadow text-sm ${ok?'border-emerald-300':'border-rose-300'}">${msg}</div>`); const t=$('#toast'); t.appendChild(n); setTimeout(()=>n.remove(), 2200); };
 
-    // ---------- Intake (multi items) ----------
+    // Intake items UI
     const itemsWrap = $('#itemsWrap');
-    function addItemRow(v={name:'', qty:1, inStock:false, toArtisan:false, notes:'', sentToQCAt:null}){
-      const row = el(`<div class="grid md:grid-cols-12 gap-2 border rounded p-2">
-        <input class="border rounded px-2 py-1 md:col-span-6" placeholder="Item name / SKU" value="${v.name}">
-        <input type="number" min="1" class="border rounded px-2 py-1 md:col-span-2" value="${v.qty||1}">
-        <button type="button" class="border rounded px-2 py-1 text-red-600 md:col-span-2">Remove</button>
+    function addItemRow(v={name:'',qty:1}){
+      const r = el(`<div class="grid grid-cols-12 gap-2 border rounded-xl p-2">
+        <input class="col-span-8 border rounded-xl px-2 py-1" placeholder="Item / SKU" value="${v.name}">
+        <input type="number" min="1" class="col-span-3 border rounded-xl px-2 py-1" value="${v.qty||1}">
+        <button type="button" class="col-span-1 btn btn-border text-rose-600">×</button>
       </div>`);
-      row.querySelector('button').onclick = ()=> row.remove();
-      itemsWrap.appendChild(row);
+      r.querySelector('button').onclick = ()=> r.remove();
+      itemsWrap.appendChild(r);
     }
     $('#addItem').onclick = ()=> addItemRow();
+    addItemRow(); // one default row
 
-    // one initial row
-    addItemRow();
+    // intake photo preview (multiple)
+    const intakePhoto = $('#intakePhoto'), intakePreview = $('#intakePreview');
+    intakePhoto.onchange = ()=>{ intakePreview.innerHTML=''; [...intakePhoto.files].forEach(f=> intakePreview.appendChild(el(`<img class="thumb" src="${URL.createObjectURL(f)}">`))); };
 
-    const intakePhoto = $('#intakePhoto');
-    const intakePreview = $('#intakePreview');
-    intakePhoto.onchange = ()=>{ intakePreview.innerHTML=''; const f=intakePhoto.files?.[0]; if(f){ intakePreview.innerHTML=`<img class="thumb" src="${URL.createObjectURL(f)}">`; } };
-
-    $('#formIntake').onsubmit = async (e)=>{
+    // ADD ORDER (safe)
+    const form = $('#formIntake'); const btnAdd = $('#btnAddOrder');
+    form.onsubmit = async (e)=>{
       e.preventDefault();
-      // collect items
-      const items = [...itemsWrap.children].map(row=>{
-        const [nameEl, qtyEl] = row.querySelectorAll('input');
-        return { name:nameEl.value.trim(), qty:parseInt(qtyEl.value||1,10), inStock:false, toArtisan:false, notes:'', sentToQCAt:null };
+      if(btnAdd.disabled) return;
+      // build items
+      const items = [...itemsWrap.children].map(r=>{
+        const [nameEl, qtyEl] = r.querySelectorAll('input');
+        return {name:nameEl.value.trim(), qty:parseInt(qtyEl.value||1,10), inStock:false, toArtisan:false, notes:'', sentToQCAt:null};
       }).filter(i=>i.name);
-      if(!items.length){ alert('Add at least one item'); return; }
+      if(!items.length){ toast('Add at least one item', false); return; }
 
-      const fd = new FormData(e.target);
-      const data = {
-        orderId: fd.get('orderId'), customer: fd.get('customer'), source: fd.get('source'),
-        courier: fd.get('courier'), remarks: fd.get('remarks')||'',
-        status: STATUS.NEW, createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
-        intakePhotos: [], items, qc:{ tracking:'', parcelPhotos:[] }
-      };
-      const ref = await addDoc(ORDERS, data);
+      const fd = new FormData(form);
+      const orderId = (fd.get('orderId')||'').trim();
+      if(!orderId){ toast('Order ID required', false); return; }
 
-      const f = intakePhoto.files?.[0];
-      if (f) {
-        const path = `orders/${ref.id}/intake_${Date.now()}_${f.name}`;
-        await uploadBytes(sRef(storage, path), f);
-        const url = await getDownloadURL(sRef(storage, path));
-        await updateDoc(doc(db,'orders',ref.id), { intakePhotos:[url], updatedAt: serverTimestamp() });
-      }
-      e.target.reset(); itemsWrap.innerHTML=''; addItemRow(); intakePreview.innerHTML='';
-      alert('Order added'); show('dashboard');
+      // prevent duplicates by Order ID
+      btnAdd.disabled = true; toast('Saving…');
+      try{
+        const exists = await getDocs(query(ORDERS, where('orderId','==', orderId)));
+        if(!exists.empty){ btnAdd.disabled=false; toast('Order ID already exists ❌', false); return; }
+
+        const data = {
+          orderId, customer: fd.get('customer'), source: fd.get('source'),
+          courier: fd.get('courier'), remarks: fd.get('remarks')||'',
+          status: STATUS.NEW, createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+          intakePhotos: [], items, qc:{ tracking:'', parcelPhotos:[] }
+        };
+        const ref = await addDoc(ORDERS, data);
+
+        // upload ALL selected photos
+        const files = [...(intakePhoto.files||[])];
+        const urls = [];
+        for(const f of files){
+          const path = `orders/${ref.id}/intake_${Date.now()}_${f.name}`;
+          await uploadBytes(sRef(storage, path), f);
+          const url = await getDownloadURL(sRef(storage, path));
+          urls.push(url);
+        }
+        if(urls.length){
+          await updateDoc(doc(db,'orders',ref.id), { intakePhotos: urls, updatedAt: serverTimestamp() });
+        }
+
+        form.reset(); itemsWrap.innerHTML=''; addItemRow(); intakePreview.innerHTML='';
+        toast('Order saved ✅'); show('dashboard');
+      }catch(err){ console.error(err); toast('Failed to save order ❌', false); }
+      finally{ btnAdd.disabled = false; }
     };
 
-    // ---------- Live data feed ----------
+    // LIVE FEED
+    const m = {new:0,prod:0,qcp:0,ship:0};
     const q = query(ORDERS, orderBy('createdAt','desc'));
     onSnapshot(q, snap=>{
-      // Dashboard
-      const dashTbody = document.querySelector('#tblDash tbody'); dashTbody.innerHTML='';
-      let cNew=0,cProd=0,cQCP=0,cShip=0;
+      m.new=m.prod=m.qcp=m.ship=0;
 
-      // views
+      // clear views
+      const dashTbody = $('#tblDash tbody'); dashTbody.innerHTML='';
       const stockList = $('#stockList'); stockList.innerHTML='';
       const orderMgrList = $('#orderMgrList'); orderMgrList.innerHTML='';
       const qcList = $('#qcList'); qcList.innerHTML='';
 
       snap.forEach(d=>{
         const o = {id:d.id, ...d.data()};
-        if(o.status===STATUS.NEW)cNew++; else if(o.status===STATUS.PROD)cProd++; else if(o.status===STATUS.QCP)cQCP++; else if(o.status===STATUS.SHIP)cShip++;
-        const firstPic = (o.intakePhotos && o.intakePhotos[0]) ? o.intakePhotos[0] : '';
+        if(o.status===STATUS.NEW)m.new++; else if(o.status===STATUS.PROD)m.prod++; else if(o.status===STATUS.QCP)m.qcp++; else if(o.status===STATUS.SHIP)m.ship++;
 
-        const readyCount = (o.items||[]).filter(i=>i.inStock || i.sentToQCAt).length;
-        const totalCount = (o.items||[]).reduce((a,i)=>a+(i.qty||1),0);
+        const total = (o.items||[]).reduce((a,i)=>a+(i.qty||1),0);
+        const pics = o.intakePhotos||[];
 
+        // Dashboard row (show thumbnails + view button)
         dashTbody.appendChild(el(`<tr>
-          <td class="p-2">${firstPic?`<a href="${firstPic}" target="_blank"><img class="thumb" src="${firstPic}"></a>`:'-'}</td>
+          <td class="p-2"><div class="flex gap-2">${pics.length?pics.map(u=>`<a href="${u}" target="_blank"><img class="thumb" src="${u}"></a>`).join(''):'-'}</div></td>
           <td class="p-2 font-medium">${o.orderId}</td>
           <td class="p-2">${o.customer||''}</td>
           <td class="p-2">${o.source||''}</td>
-          <td class="p-2">${readyCount}/${totalCount}</td>
-          <td class="p-2"><span class="pill ${o.status===STATUS.NEW?'bg-blue-50 text-blue-700':o.status===STATUS.PROD?'bg-amber-50 text-amber-700':o.status===STATUS.QCP?'bg-purple-50 text-purple-700':'bg-green-50 text-green-700'}">${o.status}</span></td>
+          <td class="p-2">${total}</td>
+          <td class="p-2">
+            <span class="chip ${o.status===STATUS.NEW?'bg-blue-100 text-blue-700':o.status===STATUS.PROD?'bg-amber-100 text-amber-800':o.status===STATUS.QCP?'bg-indigo-100 text-indigo-800':'bg-emerald-100 text-emerald-800'}">${o.status}</span>
+          </td>
+          <td class="p-2"><button class="btn btn-border text-slate-700" data-view="${o.id}">View</button></td>
         </tr>`));
 
-        // STOCK MANAGER card (per-item inStock / toArtisan)
+        // STOCK manager card (per item toggles)
         if([STATUS.NEW, STATUS.PROD].includes(o.status)){
-          const card = el(`<div class="border rounded-xl p-3">
+          const c = el(`<div class="border rounded-2xl p-3">
             <div class="flex items-center justify-between">
-              <div class="font-medium">${o.orderId} — <span class="text-xs text-gray-500">${o.customer}</span></div>
-              <div class="text-xs text-gray-500">${o.source} • ${o.courier||''}</div>
+              <div class="font-medium">${o.orderId} <span class="text-xs text-slate-500">• ${o.customer}</span></div>
+              <div class="flex gap-2">${pics.map(u=>`<a href="${u}" target="_blank"><img class="thumb" src="${u}"></a>`).join('')}</div>
             </div>
-            <div class="mt-2 overflow-auto">
+            <div class="overflow-auto mt-2">
               <table class="w-full text-sm">
-                <thead class="bg-gray-100"><tr>
-                  <th class="p-2 text-left">Item</th>
-                  <th class="p-2">Qty</th>
-                  <th class="p-2">In Stock</th>
-                  <th class="p-2">Give to Artisan</th>
-                  <th class="p-2 text-left">Notes</th>
-                  <th class="p-2">Save</th>
+                <thead class="bg-slate-100"><tr>
+                  <th class="p-2 text-left">Item</th><th class="p-2">Qty</th><th class="p-2">In Stock</th><th class="p-2">To Artisan</th><th class="p-2 text-left">Notes</th><th class="p-2">Save</th>
                 </tr></thead>
                 <tbody></tbody>
               </table>
             </div>
           </div>`);
-          const tb = card.querySelector('tbody');
+          const tb = c.querySelector('tbody');
           (o.items||[]).forEach((it,idx)=>{
             const r = el(`<tr>
               <td class="p-2">${it.name}</td>
               <td class="p-2 text-center">${it.qty||1}</td>
               <td class="p-2 text-center"><input type="checkbox" ${it.inStock?'checked':''} data-k="inStock"></td>
               <td class="p-2 text-center"><input type="checkbox" ${it.toArtisan?'checked':''} data-k="toArtisan"></td>
-              <td class="p-2"><input class="border rounded px-2 py-1 w-64" value="${it.notes||''}" data-k="notes"></td>
-              <td class="p-2"><button class="border rounded px-2 py-1">Save</button></td>
+              <td class="p-2"><input class="border rounded-xl px-2 py-1 w-60" value="${it.notes||''}" data-k="notes"></td>
+              <td class="p-2"><button class="btn btn-border">Save</button></td>
             </tr>`);
             r.querySelector('button').onclick = async ()=>{
               const inStock = r.querySelector('[data-k="inStock"]').checked;
@@ -282,122 +330,116 @@
               const nextStatus = newItems.some(x=>x.toArtisan && !x.sentToQCAt) ? STATUS.PROD :
                                 newItems.every(x=>x.inStock || x.sentToQCAt) ? STATUS.QCP : STATUS.NEW;
               await updateDoc(doc(db,'orders',o.id), { items:newItems, status: nextStatus, updatedAt: serverTimestamp() });
-              alert('Saved');
+              toast('Saved ✅');
             };
             tb.appendChild(r);
           });
-          stockList.appendChild(card);
+          stockList.appendChild(c);
         }
 
-        // ORDER MANAGER card (mark Sent to QC per item)
+        // ORDER MANAGER: mark sent to QC (+ pics visible)
         if([STATUS.PROD, STATUS.NEW].includes(o.status)){
           const pending = (o.items||[]).some(i=>!i.inStock && !i.sentToQCAt);
           if(pending){
-            const card = el(`<div class="border rounded-xl p-3">
-              <div class="font-medium">${o.orderId} — <span class="text-xs text-gray-500">${o.customer}</span></div>
-              <div class="mt-2 overflow-auto">
+            const c = el(`<div class="border rounded-2xl p-3">
+              <div class="font-medium mb-1">${o.orderId} <span class="text-xs text-slate-500">• ${o.customer}</span></div>
+              <div class="flex gap-2 mb-2">${pics.map(u=>`<a href="${u}" target="_blank"><img class="thumb" src="${u}"></a>`).join('')}</div>
+              <div class="overflow-auto">
                 <table class="w-full text-sm">
-                  <thead class="bg-gray-100"><tr>
-                    <th class="p-2 text-left">Item</th>
-                    <th class="p-2">Qty</th>
-                    <th class="p-2 text-left">Notes</th>
-                    <th class="p-2">Sent to QC?</th>
-                  </tr></thead>
+                  <thead class="bg-slate-100"><tr><th class="p-2 text-left">Item</th><th class="p-2">Qty</th><th class="p-2 text-left">Notes</th><th class="p-2">Sent to QC</th></tr></thead>
                   <tbody></tbody>
                 </table>
               </div>
             </div>`);
-            const tb = card.querySelector('tbody');
+            const tb = c.querySelector('tbody');
             (o.items||[]).forEach((it,idx)=>{
               if(it.inStock) return;
               const r = el(`<tr>
                 <td class="p-2">${it.name}</td>
                 <td class="p-2 text-center">${it.qty||1}</td>
-                <td class="p-2"><input class="border rounded px-2 py-1 w-64" value="${it.notes||''}" data-k="notes"></td>
-                <td class="p-2"><button class="border rounded px-2 py-1">Mark Sent (add date)</button></td>
+                <td class="p-2"><input class="border rounded-xl px-2 py-1 w-60" value="${it.notes||''}" data-k="notes"></td>
+                <td class="p-2"><button class="btn btn-border">Mark + Date</button></td>
               </tr>`);
               r.querySelector('button').onclick = async ()=>{
                 const notes = r.querySelector('[data-k="notes"]').value;
-                const newItems = [...o.items]; newItems[idx] = {...it, notes, sentToQCAt: new Date().toISOString()};
+                const newItems = [...o.items]; newItems[idx] = {...it, notes, sentToQCAt:new Date().toISOString()};
                 const nextStatus = newItems.every(x=>x.inStock || x.sentToQCAt) ? STATUS.QCP : STATUS.PROD;
                 await updateDoc(doc(db,'orders',o.id), { items:newItems, status: nextStatus, updatedAt: serverTimestamp() });
-                alert('Marked sent to QC');
+                toast('Marked sent to QC ✅');
               };
               tb.appendChild(r);
             });
-            orderMgrList.appendChild(card);
+            orderMgrList.appendChild(c);
           }
         }
 
-        // QC card
+        // QC: show order photos + upload parcel photos
         if([STATUS.PROD, STATUS.QCP].includes(o.status)){
-          const thumbs = (o.qc?.parcelPhotos||[]).map(u=>`<a href="${u}" target="_blank"><img class="thumb" src="${u}"></a>`).join('');
-          const card = el(`<div class="border rounded-xl p-3">
-            <div class="font-medium mb-1">${o.orderId} — <span class="text-xs text-gray-500">${o.customer}</span></div>
-            <div class="grid sm:grid-cols-2 gap-2 text-sm">
+          const parcel = (o.qc?.parcelPhotos||[]);
+          const c = el(`<div class="border rounded-2xl p-3">
+            <div class="flex items-center justify-between mb-1">
+              <div class="font-medium">${o.orderId} <span class="text-xs text-slate-500">• ${o.customer}</span></div>
+            </div>
+            <div class="mb-2">
+              <div class="text-xs text-slate-500 mb-1">Order Photos</div>
+              <div class="flex gap-2">${pics.map(u=>`<a href="${u}" target="_blank"><img class="thumb" src="${u}"></a>`).join('')||'-'}</div>
+            </div>
+            <div class="grid sm:grid-cols-2 gap-2">
               <div>
-                <!-- Hindi QC checklist -->
-                <div class="grid grid-cols-1 gap-1">
-                  ${['घाट ठीक है','स्टोन सही है','ऑईल लगा दिया','सेटिंग ठीक है','कोई स्क्रैच नहीं है','पॉलिश ठीक है','रॉडियम ठीक है','ईयरिंग का पुश सही काम कर रहा है','लॉक सही से बंद हो रहा है'].map((label,i)=>`<label class="flex items-center gap-2"><input type="checkbox" data-k="qc${i}"> ${label}</label>`).join('')}
+                <div class="text-xs text-slate-500 mb-1">Parcel Photos</div>
+                <div class="flex gap-2 items-center">${parcel.map(u=>`<a href="${u}" target="_blank"><img class="thumb" src="${u}"></a>`).join('')}
+                  <input type="file" class="file border rounded-xl px-2 py-1" accept="image/*">
                 </div>
               </div>
-              <div class="grid gap-2">
-                <div class="flex items-center gap-2">
-                  <span>Ring size</span><input class="border rounded px-2 py-1 w-24" data-k="ring">
-                  <span>सामान की गिनती</span><input class="border rounded px-2 py-1 w-24" data-k="qty">
-                </div>
-                <div>
-                  <div class="text-xs text-gray-600 mb-1">Marking</div>
-                  <div class="flex gap-3 text-xs">
-                    ${['No','14K','18K','10K','9K','925'].map(m=>`<label class="flex items-center gap-1"><input type="radio" name="m_${o.id}" value="${m}" data-k="mark"> ${m}</label>`).join('')}
-                  </div>
-                </div>
-                <div>
-                  <div class="text-xs text-gray-600">Parcel photos</div>
-                  <div class="flex gap-2 items-center">${thumbs||'-'} <input type="file" class="file border rounded px-2 py-1 ml-2" accept="image/*"></div>
-                </div>
-                <div class="flex gap-2">
-                  <input class="track border rounded px-2 py-1 flex-1" placeholder="Tracking no." value="${o.qc?.tracking||''}">
-                  <button class="save border rounded px-2 py-1">Save</button>
-                  <button class="ship bg-black text-white rounded px-2 py-1">Approve & Ship</button>
-                </div>
+              <div class="flex gap-2">
+                <input class="track border rounded-xl px-2 py-1 flex-1" placeholder="Tracking no." value="${o.qc?.tracking||''}">
+                <button class="save btn btn-border">Save</button>
+                <button class="ship btn btn-main">Approve & Ship</button>
               </div>
             </div>
           </div>`);
 
-          // upload parcel photo
-          card.querySelector('.file').onchange = async (e)=>{
+          // upload parcel
+          c.querySelector('.file').onchange = async (e)=>{
             const f = e.target.files?.[0]; if(!f) return;
             const path = `orders/${o.id}/parcel_${Date.now()}_${f.name}`;
             await uploadBytes(sRef(storage, path), f);
             const url = await getDownloadURL(sRef(storage, path));
             const photos = (o.qc?.parcelPhotos||[]).concat(url);
             await updateDoc(doc(db,'orders',o.id), { 'qc.parcelPhotos': photos, status: STATUS.QCP, updatedAt: serverTimestamp() });
-            alert('Photo added');
+            toast('Photo added ✅');
           };
-
-          // save qc
-          card.querySelector('.save').onclick = async ()=>{
-            const tracking = card.querySelector('.track').value;
-            // we just store a simple QC snapshot; checks/ring/qty/mark are informational
+          c.querySelector('.save').onclick = async ()=>{
+            const tracking = c.querySelector('.track').value;
             await updateDoc(doc(db,'orders',o.id), { qc:{ ...(o.qc||{}), tracking }, status: STATUS.QCP, updatedAt: serverTimestamp() });
-            alert('QC saved');
+            toast('QC saved ✅');
           };
-
-          // ship
-          card.querySelector('.ship').onclick = async ()=>{
+          c.querySelector('.ship').onclick = async ()=>{
             await updateDoc(doc(db,'orders',o.id), { status: STATUS.SHIP, updatedAt: serverTimestamp() });
-            alert('Marked shipped');
+            toast('Marked shipped ✅');
           };
 
-          qcList.appendChild(card);
+          qcList.appendChild(c);
         }
+
+        // detail modal open
+        document.querySelectorAll(`[data-view="${o.id}"]`).forEach(btn=>{
+          btn.onclick = ()=>{
+            $('#mTitle').textContent = `${o.orderId} — ${o.customer||''}`;
+            const box = $('#mPhotos'); box.innerHTML='';
+            (o.intakePhotos||[]).forEach(u=> box.appendChild(el(`<a href="${u}" target="_blank"><img class="thumb" src="${u}"></a>`)));
+            $('#orderModal').classList.add('open');
+          };
+        });
       });
 
-      // metrics
-      $('#mNew').textContent=cNew; $('#mProd').textContent=cProd; $('#mQCP').textContent=cQCP; $('#mShip').textContent=cShip;
+      // metrics UI
+      $('#mNew').textContent=m.new; $('#mProd').textContent=m.prod; $('#mQCP').textContent=m.qcp; $('#mShip').textContent=m.ship;
     });
+
+    // modal events
+    $('#mClose').onclick = ()=> $('#orderModal').classList.remove('open');
+    $('#orderModal').addEventListener('click', (e)=>{ if(e.target.id==='orderModal') e.currentTarget.classList.remove('open'); });
   </script>
 </body>
 </html>
-
