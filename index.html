@@ -3,11 +3,15 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>KJ Orders – Simple Intake/Production/QC</title>
+  <title>KJ Orders – Intake / Production / QC</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .thumb{width:56px;height:56px;object-fit:cover;border-radius:8px;border:1px solid #e5e7eb}
+    .pill{border-radius:999px;padding:2px 8px;font-size:12px}
+  </style>
 </head>
 <body class="bg-gray-50 text-gray-900">
-  <div class="max-w-4xl mx-auto p-4">
+  <div class="max-w-6xl mx-auto p-4">
     <h1 class="text-xl font-semibold">KJ Orders</h1>
     <p class="text-xs text-gray-500 mb-4">Intake → Production → QC/Dispatch (Firebase)</p>
 
@@ -20,9 +24,9 @@
     </div>
 
     <!-- Intake -->
-    <section id="view-intake" class="border rounded-xl bg-white p-3">
+    <section id="view-intake" class="border rounded-xl bg-white p-4">
       <h2 class="font-medium mb-2">Add order</h2>
-      <form id="formIntake" class="grid sm:grid-cols-2 gap-3">
+      <form id="formIntake" class="grid md:grid-cols-2 gap-3">
         <div>
           <label class="text-xs text-gray-600">Order ID</label>
           <input name="orderId" required class="w-full border rounded px-3 py-2" placeholder="KJ-2025-001">
@@ -43,47 +47,60 @@
         <div>
           <label class="text-xs text-gray-600">Order photo (optional)</label>
           <input id="photo" type="file" accept="image/*" class="w-full border rounded px-3 py-2">
+          <div id="photoPreview" class="mt-2"></div>
         </div>
-        <div class="sm:col-span-2">
+        <div class="md:col-span-2">
           <button class="px-3 py-2 bg-black text-white rounded" type="submit">Add Order</button>
         </div>
       </form>
 
-      <h3 class="mt-4 font-medium">Recent orders</h3>
-      <table class="w-full text-sm mt-1" id="tblIntake">
-        <thead class="bg-gray-100">
-          <tr><th class="p-2 text-left">Order</th><th class="p-2 text-left">Customer</th><th class="p-2 text-left">Source</th><th class="p-2 text-left">Status</th></tr>
-        </thead>
-        <tbody></tbody>
-      </table>
+      <h3 class="mt-5 font-medium">Recent orders</h3>
+      <div class="overflow-auto mt-1">
+        <table class="w-full text-sm" id="tblIntake">
+          <thead class="bg-gray-100">
+            <tr>
+              <th class="p-2 text-left">Photo</th>
+              <th class="p-2 text-left">Order</th>
+              <th class="p-2 text-left">Customer</th>
+              <th class="p-2 text-left">Source</th>
+              <th class="p-2 text-left">Status</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
     </section>
 
     <!-- Production -->
-    <section id="view-production" class="border rounded-xl bg-white p-3 hidden">
+    <section id="view-production" class="border rounded-xl bg-white p-4 hidden">
       <h2 class="font-medium mb-2">Mark stock / artisan</h2>
-      <table class="w-full text-sm" id="tblProd">
-        <thead class="bg-gray-100"><tr>
-          <th class="p-2 text-left">Order</th>
-          <th class="p-2">Stock?</th>
-          <th class="p-2">Give to artisan?</th>
-          <th class="p-2">Save</th>
-        </tr></thead>
-        <tbody></tbody>
-      </table>
+      <div class="overflow-auto">
+        <table class="w-full text-sm" id="tblProd">
+          <thead class="bg-gray-100"><tr>
+            <th class="p-2 text-left">Order</th>
+            <th class="p-2">Stock?</th>
+            <th class="p-2">Give to artisan?</th>
+            <th class="p-2">Save</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
     </section>
 
     <!-- QC -->
-    <section id="view-qc" class="border rounded-xl bg-white p-3 hidden">
+    <section id="view-qc" class="border rounded-xl bg-white p-4 hidden">
       <h2 class="font-medium mb-2">QC / Dispatch</h2>
-      <table class="w-full text-sm" id="tblQC">
-        <thead class="bg-gray-100"><tr>
-          <th class="p-2 text-left">Order</th>
-          <th class="p-2">Parcel photo</th>
-          <th class="p-2">Tracking</th>
-          <th class="p-2">Actions</th>
-        </tr></thead>
-        <tbody></tbody>
-      </table>
+      <div class="overflow-auto">
+        <table class="w-full text-sm" id="tblQC">
+          <thead class="bg-gray-100"><tr>
+            <th class="p-2 text-left">Order</th>
+            <th class="p-2 text-left">Parcel Photos</th>
+            <th class="p-2 text-left">Tracking</th>
+            <th class="p-2">Actions</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
     </section>
   </div>
 
@@ -94,7 +111,7 @@
     import { getFirestore, collection, addDoc, doc, onSnapshot, orderBy, query, serverTimestamp, updateDoc } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
     import { getStorage, ref as sRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-storage.js";
 
-    // Your Firebase config (from your project)
+    // Your Firebase config
     const firebaseConfig = {
       apiKey: "AIzaSyCcFWt73v5_fq2nqvCTkxh98Zd48ZesllY",
       authDomain: "order-management-portal-edc78.firebaseapp.com",
@@ -119,21 +136,35 @@
     signInAnonymously(auth);
     onAuthStateChanged(auth, u => { document.getElementById('whoami').textContent = u ? 'Signed in (anon)' : 'Not signed in'; });
 
-    // Collections & helpers
+    // Helpers
     const ORDERS = collection(db, 'orders');
     const STATUS = { NEW:'New', PROD:'In Production', QCP:'QC Pending', SHIP:'Shipped' };
     const $ = sel => document.querySelector(sel);
     const el = html => { const t=document.createElement('template'); t.innerHTML=html.trim(); return t.content.firstChild; };
 
-    // Intake: add order
-    const form = $('#formIntake'); const photo = $('#photo');
+    // Preview selected order photo
+    const photo = $('#photo'), photoPreview = $('#photoPreview');
+    photo.onchange = () => {
+      photoPreview.innerHTML = '';
+      const f = photo.files?.[0];
+      if (f) photoPreview.innerHTML = `<img class="thumb" src="${URL.createObjectURL(f)}">`;
+    };
+
+    // Intake submit
+    const form = $('#formIntake');
     form.onsubmit = async (e) => {
       e.preventDefault();
       const fd = new FormData(form);
       const data = {
-        orderId: fd.get('orderId'), customer: fd.get('customer'), source: fd.get('source'),
-        status: STATUS.NEW, createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
-        intakePhotos: [], prod:{ inStock:false, giveToArtisan:false }, qc:{ tracking:'', parcelPhotos:[] }
+        orderId: fd.get('orderId'),
+        customer: fd.get('customer'),
+        source: fd.get('source'),
+        status: STATUS.NEW,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        intakePhotos: [],
+        prod:{ inStock:false, giveToArtisan:false },
+        qc:{ tracking:'', parcelPhotos:[] }
       };
       const ref = await addDoc(ORDERS, data);
 
@@ -144,14 +175,14 @@
         const url = await getDownloadURL(sRef(storage, path));
         await updateDoc(doc(db,'orders',ref.id), { intakePhotos:[url], updatedAt: serverTimestamp() });
       }
-      form.reset();
+      form.reset(); photoPreview.innerHTML='';
       alert('Order added');
     };
 
     // Live tables
     const q = query(ORDERS, orderBy('createdAt','desc'));
     onSnapshot(q, snap => {
-      // Intake list
+      // Intake
       const tbI = $('#tblIntake tbody'); tbI.innerHTML='';
       // Production
       const tbP = $('#tblProd tbody'); tbP.innerHTML='';
@@ -160,14 +191,18 @@
 
       snap.forEach(d => {
         const o = { id: d.id, ...d.data() };
+        const firstPic = (o.intakePhotos && o.intakePhotos[0]) ? o.intakePhotos[0] : '';
 
+        // Intake row with thumbnail
         tbI.appendChild(el(`<tr>
+          <td class="p-2">${firstPic ? `<a href="${firstPic}" target="_blank"><img class="thumb" src="${firstPic}"></a>` : '-'}</td>
           <td class="p-2">${o.orderId||''}</td>
           <td class="p-2">${o.customer||''}</td>
           <td class="p-2">${o.source||''}</td>
-          <td class="p-2">${o.status}</td>
+          <td class="p-2"><span class="pill bg-blue-50 text-blue-700">${o.status}</span></td>
         </tr>`));
 
+        // Production rows
         if (o.status===STATUS.NEW || o.status===STATUS.PROD){
           const r = el(`<tr>
             <td class="p-2">${o.orderId}</td>
@@ -185,16 +220,20 @@
           tbP.appendChild(r);
         }
 
+        // QC rows with parcel photos gallery
         if (o.status===STATUS.PROD || o.status===STATUS.QCP){
+          const thumbs = (o.qc?.parcelPhotos||[]).map(u=>`<a href="${u}" target="_blank"><img class="thumb" src="${u}"></a>`).join('');
           const r = el(`<tr>
             <td class="p-2">${o.orderId}</td>
-            <td class="p-2"><input type="file" class="file border rounded px-2 py-1" accept="image/*"></td>
+            <td class="p-2"><div class="flex gap-2 items-center">${thumbs||'-'} <input type="file" class="file border rounded px-2 py-1 ml-2" accept="image/*"></div></td>
             <td class="p-2"><input value="${o.qc?.tracking||''}" class="track border rounded px-2 py-1"></td>
             <td class="p-2">
               <button class="save border rounded px-2 py-1 mr-1">Save</button>
               <button class="ship bg-black text-white rounded px-2 py-1">Approve & Ship</button>
             </td>
           </tr>`);
+
+          // upload parcel photo
           r.querySelector('.file').onchange = async (e)=>{
             const f = e.target.files?.[0]; if(!f) return;
             const path = `orders/${o.id}/parcel_${Date.now()}_${f.name}`;
@@ -204,21 +243,23 @@
             await updateDoc(doc(db,'orders',o.id), { 'qc.parcelPhotos': photos, status: STATUS.QCP, updatedAt: serverTimestamp() });
             alert('Photo added');
           };
+          // save qc
           r.querySelector('.save').onclick = async ()=>{
             const tracking = r.querySelector('.track').value;
             await updateDoc(doc(db,'orders',o.id), { qc:{ ...(o.qc||{}), tracking }, status: STATUS.QCP, updatedAt: serverTimestamp() });
             alert('QC saved');
           };
+          // ship
           r.querySelector('.ship').onclick = async ()=>{
             await updateDoc(doc(db,'orders',o.id), { status: STATUS.SHIP, updatedAt: serverTimestamp() });
             alert('Shipped');
           };
+
           tbQ.appendChild(r);
         }
       });
     });
 
-    // Default view
     show('intake');
   </script>
 </body>
